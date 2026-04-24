@@ -22,14 +22,15 @@ ChartJS.register(
 
 export default function Home() {
   const [data, setData] = useState([]);
+  const [range, setRange] = useState(14); // default
 
   useEffect(() => {
     fetchTemps();
-  }, []);
+  }, [range]);
 
   async function fetchTemps() {
     const fromDate = new Date();
-    fromDate.setDate(fromDate.getDate() - 14);
+    fromDate.setDate(fromDate.getDate() - range);
 
     const { data, error } = await supabase
       .from('netatmo_daily_stats')
@@ -55,11 +56,11 @@ export default function Home() {
       {
         label: 'Temperature (°C)',
         data: data.map(d => d.outdoor_min),
-        borderColor: '#e53935',   // red line
+        borderColor: '#e53935',
         backgroundColor: '#e53935',
         borderWidth: 2,
-        tension: 0.4,             // smooth curve
-        pointRadius: 0            // remove dots
+        tension: 0.4,
+        pointRadius: 0
       }
     ]
   };
@@ -70,44 +71,36 @@ export default function Home() {
       legend: {
         display: true,
         position: 'bottom'
-      },
-      tooltip: {
-        mode: 'index',
-        intersect: false
-      }
-    },
-    scales: {
-      y: {
-        ticks: {
-          callback: (value) => `${value}°C`
-        }
       }
     }
   };
 
   return (
-    <div style={{
-      maxWidth: 900,
-      margin: '40px auto',
-      padding: 20,
-      fontFamily: 'Arial'
-    }}>
-      <h2 style={{ marginBottom: 10 }}>
-        outdoor_minTEMP_14d
-      </h2>
+    <div style={{ maxWidth: 900, margin: '40px auto', padding: 20 }}>
+      <h2>outdoor_minTEMP_{range}d</h2>
 
-      <p style={{ color: '#666', marginBottom: 20 }}>
-        Last 14 days (Europe/Bratislava)
-      </p>
-
-      <div style={{
-        background: '#fff',
-        padding: 20,
-        borderRadius: 12,
-        boxShadow: '0 2px 10px rgba(0,0,0,0.05)'
-      }}>
-        <Line data={chartData} options={options} />
+      {/* RANGE SWITCH */}
+      <div style={{ marginBottom: 20 }}>
+        {[7, 14, 30].map(r => (
+          <button
+            key={r}
+            onClick={() => setRange(r)}
+            style={{
+              marginRight: 10,
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: '1px solid #ccc',
+              background: range === r ? '#e53935' : '#fff',
+              color: range === r ? '#fff' : '#000',
+              cursor: 'pointer'
+            }}
+          >
+            {r}d
+          </button>
+        ))}
       </div>
+
+      <Line data={chartData} options={options} />
     </div>
   );
 }

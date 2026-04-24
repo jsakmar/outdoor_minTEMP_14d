@@ -187,23 +187,22 @@ export default function Page() {
 
   // data
   useEffect(() => {
-    let mounted = true
+    const sendHeight = () => {
+      const height = document.documentElement.scrollHeight;
+      window.parent.postMessage({ type: 'resize', height }, '*');
+    };
 
-    const fetchData = async () => {
-      const since = new Date(Date.now() - range * 86400000).toISOString()
+  // run multiple times (important for charts rendering async)
+    setTimeout(sendHeight, 100);
+    setTimeout(sendHeight, 300);
+    setTimeout(sendHeight, 600);
 
-      const { data, error } = await supabase
-        .from('netatmo_measurements')
-        .select('time, temperature, module_name')
-        .gte('time', since)
-        .eq('module_name', 'Outdoor')
-        .not('temperature', 'is', null)
-        .order('time', { ascending: true })
+    window.addEventListener('resize', sendHeight);
 
-      if (!error && mounted) {
-        setData(smooth(aggregate15min(data as Row[])))
-      }
-    }
+    return () => {
+      window.removeEventListener('resize', sendHeight);
+      };
+    }, []);
 
     fetchData()
     const interval = setInterval(fetchData, 4 * 60 * 1000)

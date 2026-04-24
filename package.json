@@ -1,21 +1,25 @@
 {
-  "name": "temp-chart",
+  "name": "outdoor_minTEMP_14d",
   "version": "1.0.0",
   "private": true,
+  "engines": {
+    "node": "18.x"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start"
   },
   "dependencies": {
-  "typescript": "^5.0.0",
-  "@types/react": "^18.0.0",
-  "@types/node": "^20.0.0"
-    "next": "latest",
-    "react": "latest",
-    "react-dom": "latest",
-    "@supabase/supabase-js": "latest",
-    "chart.js": "latest",
-    "react-chartjs-2": "latest"
+    "@supabase/supabase-js": "^2.43.0",
+    "next": "^16.2.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "recharts": "^2.10.3"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/react": "^18.2.66",
+    "@types/node": "^20.11.30"
   }
 }

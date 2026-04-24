@@ -96,9 +96,9 @@ function generateTicks(data: ChartPoint[]) {
 // ---------- custom ticks ----------
 const CustomTick = ({ x, y, payload }: any) => {
   const d = new Date(payload.value)
-
   const isMidnight = d.getHours() === 0
   const show = d.getHours() % 6 === 0 || isMidnight
+
   if (!show) return null
 
   const date = d.toLocaleDateString('sk-SK', {
@@ -137,6 +137,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
 
   const d = new Date(label)
+
   const time = d.toLocaleTimeString('sk-SK', {
     timeZone: TZ,
     hour: '2-digit',
@@ -162,47 +163,42 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function Page() {
   const [data, setData] = useState<ChartPoint[]>([])
   const [range, setRange] = useState(7)
-  const [isMobile, setIsMobile] = useState(false)
 
   const channelRef = useRef<any>(null)
 
-  // auto iframe resize
+  // iframe auto resize FIXED
   useEffect(() => {
     const sendHeight = () => {
-      const height = document.body.scrollHeight
+      const height = document.documentElement.scrollHeight
       window.parent.postMessage({ type: 'resize', height }, '*')
     }
-    sendHeight()
+
+    setTimeout(sendHeight, 100)
+    setTimeout(sendHeight, 300)
+    setTimeout(sendHeight, 600)
+
     window.addEventListener('resize', sendHeight)
     return () => window.removeEventListener('resize', sendHeight)
   }, [])
 
-  // mobile detect
   useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 640)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
+    let mounted = true
 
-  // data
-  useEffect(() => {
-    const sendHeight = () => {
-      const height = document.documentElement.scrollHeight;
-      window.parent.postMessage({ type: 'resize', height }, '*');
-    };
+    const fetchData = async () => {
+      const since = new Date(Date.now() - range * 86400000).toISOString()
 
-  // run multiple times (important for charts rendering async)
-    setTimeout(sendHeight, 100);
-    setTimeout(sendHeight, 300);
-    setTimeout(sendHeight, 600);
+      const { data, error } = await supabase
+        .from('netatmo_measurements')
+        .select('time, temperature, module_name')
+        .gte('time', since)
+        .eq('module_name', 'Outdoor')
+        .not('temperature', 'is', null)
+        .order('time', { ascending: true })
 
-    window.addEventListener('resize', sendHeight);
-
-    return () => {
-      window.removeEventListener('resize', sendHeight);
-      };
-    }, []);
+      if (!error && mounted) {
+        setData(smooth(aggregate15min(data as Row[])))
+      }
+    }
 
     fetchData()
     const interval = setInterval(fetchData, 4 * 60 * 1000)
@@ -221,30 +217,16 @@ export default function Page() {
     }
   }, [range])
 
-  // stats
   const stats = useMemo(() => {
     if (!data.length) return null
     const temps = data.map(d => d.temperature)
     return {
-      min: Math.min(...temps),
-      max: Math.max(...temps),
+      min: Math.min(...temps).toFixed(1),
+      max: Math.max(...temps).toFixed(1),
     }
   }, [data])
 
   const ticks = useMemo(() => generateTicks(data), [data])
-
-  const gridLines = ticks.filter((t) => {
-    const h = new Date(t).getHours()
-
-    if (isMobile) {
-      if (range === 7) return h === 0 || h === 12
-      return h === 0
-    }
-
-    if (range === 7) return h % 4 === 0
-    if (range === 14) return h % 6 === 0
-    return h % 12 === 0
-  })
 
   return (
     <div style={{ padding: 8 }}>
@@ -267,7 +249,7 @@ export default function Page() {
             <div>{r}d</div>
             {stats && range === r && (
               <div style={{ fontSize: 10 }}>
-                ↓{stats.min.toFixed(1)} / ↑{stats.max.toFixed(1)}
+                ↓{stats.min} ↑{stats.max}
               </div>
             )}
           </button>
@@ -276,14 +258,15 @@ export default function Page() {
 
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
-          <CartesianGrid stroke="#cbd5e1" strokeOpacity={0.6} vertical={false} />
+          <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
-          {gridLines.map((t) => (
-            <ReferenceLine key={t} x={t} stroke="#cbd5e1" />
-          ))}
-
-          {/* FREEZING ZONE */}
           <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
+
+          <XAxis dataKey="time" ticks={ticks} tick={<CustomTick />} axisLine={false} tickLine={false} />
+          <YAxis tick={<CustomYTick />} axisLine={false} tickLine={false} width={30} />
+
+          <Tooltip content={<CustomTooltip />} />
+
           <Area
             type="monotone"
             dataKey="temperature"
@@ -291,16 +274,11 @@ export default function Page() {
             baseValue={0}
           />
 
-          <XAxis dataKey="time" ticks={ticks} tick={<CustomTick />} axisLine={false} tickLine={false} />
-          <YAxis tick={<CustomYTick />} axisLine={false} tickLine={false} width={30} />
-
-          <Tooltip content={<CustomTooltip />} />
-
           <Line
             type="monotone"
             dataKey="temperature"
             stroke="#22c55e"
-            strokeWidth={isMobile ? 3 : 2}
+            strokeWidth={2}
             dot={false}
           />
         </LineChart>

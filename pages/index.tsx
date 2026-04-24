@@ -115,11 +115,11 @@ const CustomTick = ({ x, y, payload }: any) => {
   return (
     <g transform={`translate(${x},${y})`}>
       {isMidnight && (
-        <text y={-10} textAnchor="middle" fill="#94a3b8" fontSize={10}>
+        <text y={-10} textAnchor="middle" fill="#cbd5e1" fontSize={10}>
           {date}
         </text>
       )}
-      <text y={10} textAnchor="middle" fill="#94a3b8" fontSize={10}>
+      <text y={10} textAnchor="middle" fill="#cbd5e1" fontSize={10}>
         {hour}
       </text>
     </g>
@@ -166,7 +166,7 @@ export default function Page() {
 
   const channelRef = useRef<any>(null)
 
-  // iframe auto resize FIXED
+  // iframe resize
   useEffect(() => {
     const sendHeight = () => {
       const height = document.documentElement.scrollHeight
@@ -228,6 +228,11 @@ export default function Page() {
 
   const ticks = useMemo(() => generateTicks(data), [data])
 
+  // ✅ midnight vertical lines
+  const midnightLines = ticks.filter(
+    (t) => new Date(t).getHours() === 0
+  )
+
   return (
     <div style={{ padding: 8 }}>
       {/* RANGE */}
@@ -260,6 +265,12 @@ export default function Page() {
         <LineChart data={data}>
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
+          {/* midnight vertical grid */}
+          {midnightLines.map((t) => (
+            <ReferenceLine key={t} x={t} stroke="#cbd5e1" strokeOpacity={0.6} />
+          ))}
+
+          {/* 0°C line */}
           <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
 
           <XAxis dataKey="time" ticks={ticks} tick={<CustomTick />} axisLine={false} tickLine={false} />

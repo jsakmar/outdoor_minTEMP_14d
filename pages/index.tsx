@@ -14,14 +14,15 @@ import {
   CartesianGrid,
 } from 'recharts'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 type Row = {
   time: string
   temperature: number
+  module_name: string
 }
 
 type ChartPoint = {
@@ -131,13 +132,7 @@ const CustomTick = ({ x, y, payload }: any) => {
 
 // ---------- Y tick ----------
 const CustomYTick = ({ y, payload }: any) => (
-  <text
-    x={6}
-    y={y + 3}
-    fill="#64748b"
-    fontSize={11}
-    textAnchor="start"
-  >
+  <text x={6} y={y + 3} fill="#64748b" fontSize={11}>
     {payload.value}
   </text>
 )
@@ -159,7 +154,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return (
     <div
       style={{
-        background: '#ffffff',
+        background: '#fff',
         border: '1px solid #e2e8f0',
         borderRadius: 6,
         padding: '5px 7px',
@@ -184,7 +179,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 // ---------- MAIN ----------
 export default function Page() {
   const [data, setData] = useState<ChartPoint[]>([])
-  const [range, setRange] = useState(7)
+  const [range, setRange] = useState<number>(7)
 
   const channelRef = useRef<any>(null)
 
@@ -198,7 +193,7 @@ export default function Page() {
 
       const { data, error } = await supabase
         .from('netatmo_measurements')
-        .select('time, temperature')
+        .select('time, temperature, module_name')
         .gte('time', since)
         .eq('module_name', 'Outdoor')
         .not('temperature', 'is', null)

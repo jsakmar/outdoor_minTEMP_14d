@@ -96,6 +96,7 @@ function generateTicks(data: ChartPoint[]) {
 // ---------- custom ticks ----------
 const CustomTick = ({ x, y, payload }: any) => {
   const d = new Date(payload.value)
+
   const isMidnight = d.getHours() === 0
   const show = d.getHours() % 6 === 0 || isMidnight
 
@@ -114,20 +115,32 @@ const CustomTick = ({ x, y, payload }: any) => {
 
   return (
     <g transform={`translate(${x},${y})`}>
-      {isMidnight && (
-        <text y={-10} textAnchor="middle" fill="#cbd5e1" fontSize={10}>
+      {isMidnight ? (
+        <text
+          y={10}
+          textAnchor="middle"
+          fill="#000"
+          fontSize={11}
+          fontWeight={600}
+        >
           {date}
         </text>
+      ) : (
+        <text
+          y={10}
+          textAnchor="middle"
+          fill="#000"
+          fontSize={11}
+        >
+          {hour}
+        </text>
       )}
-      <text y={10} textAnchor="middle" fill="#cbd5e1" fontSize={10}>
-        {hour}
-      </text>
     </g>
   )
 }
 
 const CustomYTick = ({ y, payload }: any) => (
-  <text x={4} y={y + 3} fill="#94a3b8" fontSize={10}>
+  <text x={4} y={y + 3} fill="#000" fontSize={11}>
     {payload.value}
   </text>
 )
@@ -228,7 +241,6 @@ export default function Page() {
 
   const ticks = useMemo(() => generateTicks(data), [data])
 
-  // ✅ midnight vertical lines
   const midnightLines = ticks.filter(
     (t) => new Date(t).getHours() === 0
   )
@@ -265,7 +277,7 @@ export default function Page() {
         <LineChart data={data}>
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
-          {/* midnight vertical grid */}
+          {/* midnight vertical lines */}
           {midnightLines.map((t) => (
             <ReferenceLine key={t} x={t} stroke="#cbd5e1" strokeOpacity={0.6} />
           ))}
@@ -273,8 +285,21 @@ export default function Page() {
           {/* 0°C line */}
           <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
 
-          <XAxis dataKey="time" ticks={ticks} tick={<CustomTick />} axisLine={false} tickLine={false} />
-          <YAxis tick={<CustomYTick />} axisLine={false} tickLine={false} width={30} />
+          <XAxis
+            dataKey="time"
+            ticks={ticks}
+            interval={0}
+            tick={<CustomTick />}
+            axisLine={false}
+            tickLine={false}
+          />
+
+          <YAxis
+            tick={<CustomYTick />}
+            axisLine={false}
+            tickLine={false}
+            width={30}
+          />
 
           <Tooltip content={<CustomTooltip />} />
 

@@ -99,7 +99,6 @@ const CustomTick = ({ x, y, payload }: any) => {
 
   const isMidnight = d.getHours() === 0
   const show = d.getHours() % 6 === 0 || isMidnight
-
   if (!show) return null
 
   const date = d.toLocaleDateString('sk-SK', {
@@ -138,7 +137,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
 
   const d = new Date(label)
-
   const time = d.toLocaleTimeString('sk-SK', {
     timeZone: TZ,
     hour: '2-digit',
@@ -168,6 +166,17 @@ export default function Page() {
 
   const channelRef = useRef<any>(null)
 
+  // auto iframe resize
+  useEffect(() => {
+    const sendHeight = () => {
+      const height = document.body.scrollHeight
+      window.parent.postMessage({ type: 'resize', height }, '*')
+    }
+    sendHeight()
+    window.addEventListener('resize', sendHeight)
+    return () => window.removeEventListener('resize', sendHeight)
+  }, [])
+
   // mobile detect
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640)
@@ -176,7 +185,7 @@ export default function Page() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
-  // data fetch
+  // data
   useEffect(() => {
     let mounted = true
 
@@ -218,8 +227,8 @@ export default function Page() {
     if (!data.length) return null
     const temps = data.map(d => d.temperature)
     return {
-      min: Math.min(...temps).toFixed(1),
-      max: Math.max(...temps).toFixed(1),
+      min: Math.min(...temps),
+      max: Math.max(...temps),
     }
   }, [data])
 
@@ -239,60 +248,54 @@ export default function Page() {
   })
 
   return (
-    <div style={{ padding: 10 }}>
-      {/* RANGE + STATS */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
+    <div style={{ padding: 8 }}>
+      {/* RANGE */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
         {[7, 14, 30].map(r => (
           <button
             key={r}
             onClick={() => setRange(r)}
             style={{
               flex: 1,
-              padding: '10px 0',
-              borderRadius: 10,
+              padding: '8px 0',
+              borderRadius: 8,
               border: '1px solid #e2e8f0',
               background: range === r ? '#22c55e' : '#fff',
               color: range === r ? '#fff' : '#64748b',
-              fontSize: 13,
-              lineHeight: 1.2
+              fontSize: 12
             }}
           >
             <div>{r}d</div>
-
             {stats && range === r && (
-              <div style={{ fontSize: 11, marginTop: 2 }}>
-                ↓{stats.min} / ↑{stats.max}
+              <div style={{ fontSize: 10 }}>
+                ↓{stats.min.toFixed(1)} / ↑{stats.max.toFixed(1)}
               </div>
             )}
           </button>
         ))}
       </div>
 
-      <ResponsiveContainer width="100%" height={isMobile ? 220 : 300}>
+      <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
-          <CartesianGrid stroke="#e2e8f0" vertical={false} />
+          <CartesianGrid stroke="#cbd5e1" strokeOpacity={0.6} vertical={false} />
 
           {gridLines.map((t) => (
-            <ReferenceLine key={t} x={t} stroke="#e2e8f0" />
+            <ReferenceLine key={t} x={t} stroke="#cbd5e1" />
           ))}
 
-          <XAxis
-            dataKey="time"
-            ticks={ticks}
-            tick={<CustomTick />}
-            axisLine={false}
-            tickLine={false}
-          />
-
-          <YAxis tick={<CustomYTick />} axisLine={false} tickLine={false} width={30} />
-
-          <Tooltip content={<CustomTooltip />} />
-
+          {/* FREEZING ZONE */}
+          <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
           <Area
             type="monotone"
             dataKey="temperature"
-            fill="rgba(34,197,94,0.12)"
+            fill="rgba(59,130,246,0.12)"
+            baseValue={0}
           />
+
+          <XAxis dataKey="time" ticks={ticks} tick={<CustomTick />} axisLine={false} tickLine={false} />
+          <YAxis tick={<CustomYTick />} axisLine={false} tickLine={false} width={30} />
+
+          <Tooltip content={<CustomTooltip />} />
 
           <Line
             type="monotone"

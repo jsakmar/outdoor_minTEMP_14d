@@ -14,10 +14,10 @@ import {
   CartesianGrid,
 } from 'recharts'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-
-const supabase = createClient(supabaseUrl, supabaseKey)
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+)
 
 type Row = {
   time: string
@@ -93,15 +93,12 @@ function generateTicks(data: ChartPoint[]) {
   return ticks
 }
 
-// ---------- X tick ----------
+// ---------- custom ticks ----------
 const CustomTick = ({ x, y, payload }: any) => {
   const d = new Date(payload.value)
 
-  const isMidnight =
-    d.getHours() === 0 && d.getMinutes() === 0
-
-  const show =
-    d.getHours() % 4 === 0 || isMidnight
+  const isMidnight = d.getHours() === 0
+  const show = d.getHours() % 6 === 0 || isMidnight
 
   if (!show) return null
 
@@ -119,20 +116,19 @@ const CustomTick = ({ x, y, payload }: any) => {
   return (
     <g transform={`translate(${x},${y})`}>
       {isMidnight && (
-        <text y={-10} textAnchor="middle" fill="#64748b" fontSize={11}>
+        <text y={-10} textAnchor="middle" fill="#94a3b8" fontSize={10}>
           {date}
         </text>
       )}
-      <text y={10} textAnchor="middle" fill="#64748b" fontSize={11}>
+      <text y={10} textAnchor="middle" fill="#94a3b8" fontSize={10}>
         {hour}
       </text>
     </g>
   )
 }
 
-// ---------- Y tick ----------
 const CustomYTick = ({ y, payload }: any) => (
-  <text x={6} y={y + 3} fill="#64748b" fontSize={11}>
+  <text x={4} y={y + 3} fill="#94a3b8" fontSize={10}>
     {payload.value}
   </text>
 )
@@ -149,28 +145,16 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     minute: '2-digit',
   })
 
-  const value = payload[0].value
-
   return (
-    <div
-      style={{
-        background: '#fff',
-        border: '1px solid #e2e8f0',
-        borderRadius: 6,
-        padding: '5px 7px',
-      }}
-    >
-      <div style={{ color: '#64748b', fontSize: 11 }}>
-        {time}
-      </div>
-      <div
-        style={{
-          color: '#22c55e',
-          fontWeight: 600,
-          fontSize: 12,
-        }}
-      >
-        {value}°C
+    <div style={{
+      background: '#fff',
+      border: '1px solid #e2e8f0',
+      borderRadius: 6,
+      padding: '6px 8px'
+    }}>
+      <div style={{ fontSize: 11, color: '#64748b' }}>{time}</div>
+      <div style={{ fontWeight: 600, color: '#22c55e' }}>
+        {payload[0].value}°C
       </div>
     </div>
   )
@@ -179,17 +163,24 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 // ---------- MAIN ----------
 export default function Page() {
   const [data, setData] = useState<ChartPoint[]>([])
-  const [range, setRange] = useState<number>(7)
+  const [range, setRange] = useState(7)
+  const [isMobile, setIsMobile] = useState(false)
 
   const channelRef = useRef<any>(null)
 
+  // detect mobile
   useEffect(() => {
-    let isMounted = true
+    const check = () => setIsMobile(window.innerWidth < 640)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
+
+  useEffect(() => {
+    let mounted = true
 
     const fetchData = async () => {
-      const since = new Date(
-        Date.now() - range * 24 * 60 * 60 * 1000
-      ).toISOString()
+      const since = new Date(Date.now() - range * 86400000).toISOString()
 
       const { data, error } = await supabase
         .from('netatmo_measurements')
@@ -199,79 +190,60 @@ export default function Page() {
         .not('temperature', 'is', null)
         .order('time', { ascending: true })
 
-      if (!error && isMounted) {
-        setData(
-          smooth(aggregate15min(data as Row[]))
-        )
+      if (!error && mounted) {
+        setData(smooth(aggregate15min(data as Row[])))
       }
     }
 
     fetchData()
-
     const interval = setInterval(fetchData, 4 * 60 * 1000)
 
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchData()
-    }
-
-    window.addEventListener('focus', fetchData)
-    document.addEventListener('visibilitychange', handleVisibility)
-
     if (!channelRef.current) {
-      const channel = supabase.channel('realtime-temp')
-
-      channel
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'netatmo_measurements',
-          },
-          () => fetchData()
-        )
+      channelRef.current = supabase
+        .channel('realtime')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'netatmo_measurements' }, fetchData)
         .subscribe()
-
-      channelRef.current = channel
     }
 
     return () => {
-      isMounted = false
+      mounted = false
       clearInterval(interval)
-      window.removeEventListener('focus', fetchData)
-      document.removeEventListener('visibilitychange', handleVisibility)
-
-      if (channelRef.current) {
-        supabase.removeChannel(channelRef.current)
-        channelRef.current = null
-      }
+      if (channelRef.current) supabase.removeChannel(channelRef.current)
     }
   }, [range])
 
   const ticks = useMemo(() => generateTicks(data), [data])
 
-  const midnight = ticks.filter(
-    (t) => new Date(t).getHours() === 0
-  )
-  const every4h = ticks.filter(
-    (t) => new Date(t).getHours() % 4 === 0
-  )
+  const gridLines = ticks.filter((t) => {
+    const h = new Date(t).getHours()
+
+    if (isMobile) {
+      if (range === 7) return h === 0 || h === 12
+      return h === 0
+    }
+
+    if (range === 7) return h % 4 === 0
+    if (range === 14) return h % 6 === 0
+    return h % 12 === 0
+  })
+
+  const last = data[data.length - 1]
 
   return (
     <div style={{ padding: 10 }}>
-      {/* RANGE SWITCH */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+      {/* RANGE */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         {[7, 14, 30].map(r => (
           <button
             key={r}
             onClick={() => setRange(r)}
             style={{
-              padding: '6px 12px',
-              borderRadius: 6,
+              flex: 1,
+              padding: '10px 0',
+              borderRadius: 10,
               border: '1px solid #e2e8f0',
               background: range === r ? '#22c55e' : '#fff',
-              color: range === r ? '#fff' : '#64748b',
-              cursor: 'pointer'
+              color: range === r ? '#fff' : '#64748b'
             }}
           >
             {r}d
@@ -279,50 +251,49 @@ export default function Page() {
         ))}
       </div>
 
-      <ResponsiveContainer width="100%" height={300}>
+      {/* LAST VALUE */}
+      {last && (
+        <div style={{
+          fontSize: 18,
+          fontWeight: 600,
+          marginBottom: 6,
+          color: '#22c55e'
+        }}>
+          {last.temperature}°C
+        </div>
+      )}
+
+      <ResponsiveContainer width="100%" height={isMobile ? 220 : 300}>
         <LineChart data={data}>
-          <CartesianGrid stroke="#e2e8f0" />
+          <CartesianGrid stroke="#e2e8f0" vertical={false} />
 
-          {every4h.map((t) => (
+          {gridLines.map((t) => (
             <ReferenceLine key={t} x={t} stroke="#e2e8f0" />
-          ))}
-
-          {midnight.map((t) => (
-            <ReferenceLine key={t} x={t} stroke="#94a3b8" />
           ))}
 
           <XAxis
             dataKey="time"
             ticks={ticks}
-            interval={0}
             tick={<CustomTick />}
             axisLine={false}
             tickLine={false}
           />
 
-          <YAxis
-            tick={<CustomYTick />}
-            axisLine={false}
-            tickLine={false}
-            width={30}
-          />
-
-          <ReferenceLine y={0} stroke="#000" strokeOpacity={0.3} />
+          <YAxis tick={<CustomYTick />} axisLine={false} tickLine={false} width={30} />
 
           <Tooltip content={<CustomTooltip />} />
 
           <Area
             type="monotone"
             dataKey="temperature"
-            fill="rgba(34,197,94,0.15)"
-            stroke="none"
+            fill="rgba(34,197,94,0.12)"
           />
 
           <Line
             type="monotone"
             dataKey="temperature"
             stroke="#22c55e"
-            strokeWidth={2}
+            strokeWidth={isMobile ? 3 : 2}
             dot={false}
           />
         </LineChart>

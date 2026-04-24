@@ -168,7 +168,7 @@ export default function Page() {
 
   const channelRef = useRef<any>(null)
 
-  // detect mobile
+  // mobile detect
   useEffect(() => {
     const check = () => setIsMobile(window.innerWidth < 640)
     check()
@@ -176,6 +176,7 @@ export default function Page() {
     return () => window.removeEventListener('resize', check)
   }, [])
 
+  // data fetch
   useEffect(() => {
     let mounted = true
 
@@ -212,6 +213,16 @@ export default function Page() {
     }
   }, [range])
 
+  // stats
+  const stats = useMemo(() => {
+    if (!data.length) return null
+    const temps = data.map(d => d.temperature)
+    return {
+      min: Math.min(...temps).toFixed(1),
+      max: Math.max(...temps).toFixed(1),
+    }
+  }, [data])
+
   const ticks = useMemo(() => generateTicks(data), [data])
 
   const gridLines = ticks.filter((t) => {
@@ -227,11 +238,9 @@ export default function Page() {
     return h % 12 === 0
   })
 
-  const last = data[data.length - 1]
-
   return (
     <div style={{ padding: 10 }}>
-      {/* RANGE */}
+      {/* RANGE + STATS */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
         {[7, 14, 30].map(r => (
           <button
@@ -243,25 +252,21 @@ export default function Page() {
               borderRadius: 10,
               border: '1px solid #e2e8f0',
               background: range === r ? '#22c55e' : '#fff',
-              color: range === r ? '#fff' : '#64748b'
+              color: range === r ? '#fff' : '#64748b',
+              fontSize: 13,
+              lineHeight: 1.2
             }}
           >
-            {r}d
+            <div>{r}d</div>
+
+            {stats && range === r && (
+              <div style={{ fontSize: 11, marginTop: 2 }}>
+                ↓{stats.min} / ↑{stats.max}
+              </div>
+            )}
           </button>
         ))}
       </div>
-
-      {/* LAST VALUE */}
-      {last && (
-        <div style={{
-          fontSize: 18,
-          fontWeight: 600,
-          marginBottom: 6,
-          color: '#22c55e'
-        }}>
-          {last.temperature}°C
-        </div>
-      )}
 
       <ResponsiveContainer width="100%" height={isMobile ? 220 : 300}>
         <LineChart data={data}>

@@ -98,9 +98,7 @@ const CustomTick = ({ x, y, payload }: any) => {
   const d = new Date(payload.value)
 
   const isMidnight = d.getHours() === 0
-  const show = d.getHours() % 6 === 0 || isMidnight
-
-  if (!show) return null
+  if (!isMidnight) return null
 
   const date = d.toLocaleDateString('sk-SK', {
     timeZone: TZ,
@@ -108,33 +106,17 @@ const CustomTick = ({ x, y, payload }: any) => {
     month: '2-digit',
   })
 
-  const hour = d.toLocaleTimeString('sk-SK', {
-    timeZone: TZ,
-    hour: '2-digit',
-  })
-
   return (
     <g transform={`translate(${x},${y})`}>
-      {isMidnight ? (
-        <text
-          y={10}
-          textAnchor="middle"
-          fill="#000"
-          fontSize={11}
-          fontWeight={600}
-        >
-          {date}
-        </text>
-      ) : (
-        <text
-          y={10}
-          textAnchor="middle"
-          fill="#000"
-          fontSize={11}
-        >
-          {hour}
-        </text>
-      )}
+      <text
+        y={10}
+        textAnchor="middle"
+        fill="#000"
+        fontSize={11}
+        fontWeight={600}
+      >
+        {date}
+      </text>
     </g>
   )
 }

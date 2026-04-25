@@ -12,11 +12,12 @@ import {
   ReferenceLine,
   Area,
   CartesianGrid,
+  Bar,
 } from 'recharts'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 type Row = {
@@ -25,9 +26,15 @@ type Row = {
   module_name: string
 }
 
+type RainRow = {
+  day: string
+  rain_sum: number
+}
+
 type ChartPoint = {
   time: string
   temperature: number
+  rain: number
 }
 
 const TZ = 'Europe/Bratislava'
@@ -50,6 +57,7 @@ function aggregate15min(data: Row[]): ChartPoint[] {
       time,
       temperature:
         temps.reduce((a, b) => a + b, 0) / temps.length,
+      rain: 0
     }))
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
 }
@@ -68,7 +76,7 @@ function smooth(data: ChartPoint[]): ChartPoint[] {
       slice.length
 
     return {
-      time: point.time,
+      ...point,
       temperature: Number(avg.toFixed(1)),
     }
   })
@@ -97,8 +105,7 @@ function generateTicks(data: ChartPoint[]) {
 const CustomTick = ({ x, y, payload }: any) => {
   const d = new Date(payload.value)
 
-  const isMidnight = d.getHours() === 0
-  if (!isMidnight) return null
+  if (d.getHours() !== 0) return null
 
   const date = d.toLocaleDateString('sk-SK', {
     timeZone: TZ,
@@ -108,13 +115,7 @@ const CustomTick = ({ x, y, payload }: any) => {
 
   return (
     <g transform={`translate(${x},${y})`}>
-      <text
-        y={10}
-        textAnchor="middle"
-        fill="#000"
-        fontSize={11}
-        fontWeight={600}
-      >
+      <text y={10} textAnchor="middle" fill="#000" fontSize={11} fontWeight={600}>
         {date}
       </text>
     </g>
@@ -147,8 +148,13 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       padding: '6px 8px'
     }}>
       <div style={{ fontSize: 11, color: '#64748b' }}>{time}</div>
+
       <div style={{ fontWeight: 600, color: '#22c55e' }}>
-        {payload[0].value}°C
+        {payload.find((p: any) => p.dataKey === 'temperature')?.value}°C
+      </div>
+
+      <div style={{ fontSize: 11, color: '#0ea5e9' }}>
+        ☔ {payload.find((p: any) => p.dataKey === 'rain')?.value?.toFixed(2)} mm
       </div>
     </div>
   )
@@ -158,74 +164,84 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function Page() {
   const [data, setData] = useState<ChartPoint[]>([])
   const [range, setRange] = useState(7)
-
   const channelRef = useRef<any>(null)
-
-  // iframe resize
-  useEffect(() => {
-    const sendHeight = () => {
-      const height = document.documentElement.scrollHeight
-      window.parent.postMessage({ type: 'resize', height }, '*')
-    }
-
-    setTimeout(sendHeight, 100)
-    setTimeout(sendHeight, 300)
-    setTimeout(sendHeight, 600)
-
-    window.addEventListener('resize', sendHeight)
-    return () => window.removeEventListener('resize', sendHeight)
-  }, [])
 
   useEffect(() => {
     let mounted = true
 
-    const fetchData = async () => {
-      const since = new Date(Date.now() - range * 86400000).toISOString()
+    const fetchAll = async () => {
+      const sinceDate = new Date(Date.now() - range * 86400000)
+      const sinceISO = sinceDate.toISOString()
+      const sinceDay = sinceISO.slice(0, 10)
 
-      const { data, error } = await supabase
+      // --- temperature ---
+      const { data: tempRaw } = await supabase
         .from('netatmo_measurements')
         .select('time, temperature, module_name')
-        .gte('time', since)
+        .gte('time', sinceISO)
         .eq('module_name', 'Outdoor')
         .not('temperature', 'is', null)
         .order('time', { ascending: true })
 
-      if (!error && mounted) {
-        setData(smooth(aggregate15min(data as Row[])))
-      }
+      // --- rain ---
+      const { data: rainRaw } = await supabase
+        .from('netatmo_daily_stats')
+        .select('day, rain_sum')
+        .gte('day', sinceDay)
+        .order('day', { ascending: true })
+
+      if (!mounted) return
+
+      const tempData = smooth(aggregate15min(tempRaw as Row[]))
+
+      const rainMap = Object.fromEntries(
+        (rainRaw as RainRow[]).map(r => [r.day, r.rain_sum || 0])
+      )
+
+      // count points per day
+      const counts: Record<string, number> = {}
+      tempData.forEach(p => {
+        const d = p.time.slice(0, 10)
+        counts[d] = (counts[d] || 0) + 1
+      })
+
+      // merge + distribute
+      const merged = tempData.map(p => {
+        const d = p.time.slice(0, 10)
+        return {
+          ...p,
+          rain: (rainMap[d] || 0) / counts[d]
+        }
+      })
+
+      setData(merged)
     }
 
-    fetchData()
-    const interval = setInterval(fetchData, 4 * 60 * 1000)
-
-    if (!channelRef.current) {
-      channelRef.current = supabase
-        .channel('realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'netatmo_measurements' }, fetchData)
-        .subscribe()
-    }
+    fetchAll()
+    const interval = setInterval(fetchAll, 4 * 60 * 1000)
 
     return () => {
       mounted = false
       clearInterval(interval)
-      if (channelRef.current) supabase.removeChannel(channelRef.current)
     }
   }, [range])
 
+  // ---------- stats ----------
   const stats = useMemo(() => {
     if (!data.length) return null
+
     const temps = data.map(d => d.temperature)
+    const rainTotal = data.reduce((sum, d) => sum + d.rain, 0)
+
     return {
       min: Math.min(...temps).toFixed(1),
       max: Math.max(...temps).toFixed(1),
+      rain: rainTotal.toFixed(1)
     }
   }, [data])
 
   const ticks = useMemo(() => generateTicks(data), [data])
-
-  const midnightLines = ticks.filter(
-    (t) => new Date(t).getHours() === 0
-  )
+  const midnightLines = ticks.filter(t => new Date(t).getHours() === 0)
 
   return (
     <div style={{ padding: 8 }}>
@@ -248,7 +264,7 @@ export default function Page() {
             <div>{r}d</div>
             {stats && range === r && (
               <div style={{ fontSize: 10 }}>
-                ↓{stats.min} ↑{stats.max}
+                ↓{stats.min} ↑{stats.max} ☔{stats.rain}
               </div>
             )}
           </button>
@@ -259,12 +275,10 @@ export default function Page() {
         <LineChart data={data}>
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
-          {/* midnight vertical lines */}
           {midnightLines.map((t) => (
             <ReferenceLine key={t} x={t} stroke="#cbd5e1" strokeOpacity={0.6} />
           ))}
 
-          {/* 0°C line */}
           <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
 
           <XAxis
@@ -277,7 +291,16 @@ export default function Page() {
           />
 
           <YAxis
+            yAxisId="temp"
             tick={<CustomYTick />}
+            axisLine={false}
+            tickLine={false}
+            width={30}
+          />
+
+          <YAxis
+            yAxisId="rain"
+            orientation="right"
             axisLine={false}
             tickLine={false}
             width={30}
@@ -285,7 +308,15 @@ export default function Page() {
 
           <Tooltip content={<CustomTooltip />} />
 
+          {/* rain bars */}
+          <Bar
+            yAxisId="rain"
+            dataKey="rain"
+            barSize={6}
+          />
+
           <Area
+            yAxisId="temp"
             type="monotone"
             dataKey="temperature"
             fill="rgba(59,130,246,0.12)"
@@ -293,6 +324,7 @@ export default function Page() {
           />
 
           <Line
+            yAxisId="temp"
             type="monotone"
             dataKey="temperature"
             stroke="#22c55e"

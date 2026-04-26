@@ -204,7 +204,7 @@ export default function Page() {
   return (
     <div style={{
       width: '100%',
-      maxWidth: 740,
+      maxWidth: 1000,
       margin: '0 auto',
       height: 280,
       padding: '6px 0 0 0',

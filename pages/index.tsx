@@ -4,8 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, ReferenceLine, Area,
-  CartesianGrid, Bar,
+  ResponsiveContainer, Area, CartesianGrid, Bar
 } from 'recharts'
 
 const supabase = createClient(
@@ -25,124 +24,38 @@ type RainRow = {
 }
 
 type ChartPoint = {
-  time: string
+  time: number   // 👈 IMPORTANT: use timestamp (not string)
   temperature: number
   rain: number | null
 }
 
 const TZ = 'Europe/Bratislava'
 
-// ---------- SAFE NUMBER ----------
+// ---------- SAFE ----------
 const safe = (v: any) =>
   typeof v === 'number' && isFinite(v) ? v : 0
 
 // ---------- aggregation ----------
 function aggregate15min(data: Row[]): ChartPoint[] {
-  const buckets: Record<string, number[]> = {}
+  const buckets: Record<number, number[]> = {}
 
-  data.forEach((row) => {
+  data.forEach(row => {
     if (row.temperature == null) return
 
-    const d = new Date(row.time)
-    if (isNaN(d.getTime())) return
+    const t = new Date(row.time).getTime()
+    if (!t) return
 
-    d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0)
+    const rounded = Math.floor(t / (15 * 60 * 1000)) * (15 * 60 * 1000)
 
-    const key = d.toISOString()
-    if (!buckets[key]) buckets[key] = []
-    buckets[key].push(Number(row.temperature))
+    if (!buckets[rounded]) buckets[rounded] = []
+    buckets[rounded].push(Number(row.temperature))
   })
 
-  return Object.entries(buckets)
-    .map(([time, temps]) => {
-      if (!temps.length) return null
-
-      const avg = temps.reduce((a, b) => a + b, 0) / temps.length
-
-      return {
-        time,
-        temperature: safe(avg),
-        rain: null
-      }
-    })
-    .filter(Boolean) as ChartPoint[]
-}
-
-// ---------- smoothing ----------
-function smooth(data: ChartPoint[]): ChartPoint[] {
-  const w = 3
-
-  return data.map((p, i) => {
-    const slice = data.slice(
-      Math.max(0, i - w),
-      Math.min(data.length, i + w + 1)
-    )
-
-    const avg = slice.length
-      ? slice.reduce((s, x) => s + safe(x.temperature), 0) / slice.length
-      : 0
-
-    return { ...p, temperature: Number(avg.toFixed(1)) }
-  })
-}
-
-// ---------- ticks ----------
-function generateTicks(data: ChartPoint[]) {
-  if (!data.length) return []
-
-  const start = new Date(data[0].time)
-  const end = new Date(data[data.length - 1].time)
-
-  if (isNaN(start.getTime()) || isNaN(end.getTime())) return []
-
-  const ticks: string[] = []
-  const c = new Date(start)
-  c.setMinutes(0, 0, 0)
-
-  while (c <= end) {
-    ticks.push(c.toISOString())
-    c.setHours(c.getHours() + 1)
-  }
-
-  return ticks
-}
-
-// ---------- tooltip ----------
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (!active || !payload?.length) return null
-
-  const d = new Date(label)
-  if (isNaN(d.getTime())) return null
-
-  const time = d.toLocaleTimeString('sk-SK', {
-    timeZone: TZ,
-    hour: '2-digit',
-    minute: '2-digit',
-  })
-
-  const temp = safe(payload.find((p: any) => p.dataKey === 'temperature')?.value)
-  const rain = safe(payload.find((p: any) => p.dataKey === 'rain')?.value)
-
-  return (
-    <div style={{
-      background: '#fff',
-      border: '1px solid #e2e8f0',
-      borderRadius: 6,
-      padding: '6px 8px'
-    }}>
-      <div style={{ fontSize: 11, color: '#64748b' }}>{time}</div>
-
-      <div style={{ fontWeight: 600, color: '#22c55e' }}>
-        {temp.toFixed(1)}°C
-      </div>
-
-      {rain > 0 && (
-        <div style={{ fontSize: 11, color: '#0ea5e9' }}>
-          ☔ {rain.toFixed(2)} mm
-        </div>
-      )}
-    </div>
-  )
+  return Object.entries(buckets).map(([time, temps]) => ({
+    time: Number(time),
+    temperature: safe(temps.reduce((a, b) => a + b, 0) / temps.length),
+    rain: null
+  }))
 }
 
 // ---------- MAIN ----------
@@ -154,8 +67,8 @@ export default function Page() {
     let mounted = true
 
     const fetchAll = async () => {
-      const since = new Date(Date.now() - range * 86400000)
-      const sinceISO = since.toISOString()
+      const since = Date.now() - range * 86400000
+      const sinceISO = new Date(since).toISOString()
       const sinceDay = sinceISO.slice(0, 10)
 
       const { data: tempRaw } = await supabase
@@ -163,18 +76,16 @@ export default function Page() {
         .select('time, temperature, module_name')
         .gte('time', sinceISO)
         .eq('module_name', 'Outdoor')
-        .not('temperature', 'is', null)
         .order('time', { ascending: true })
 
       const { data: rainRaw } = await supabase
         .from('netatmo_daily_stats')
         .select('day, rain_sum')
         .gte('day', sinceDay)
-        .order('day', { ascending: true })
 
       if (!mounted) return
 
-      const tempData = smooth(aggregate15min(tempRaw ?? []))
+      const tempData = aggregate15min(tempRaw ?? [])
 
       const rainMap: Record<string, number> = {}
       ;(rainRaw as RainRow[] || []).forEach(r => {
@@ -183,12 +94,12 @@ export default function Page() {
 
       const counts: Record<string, number> = {}
       tempData.forEach(p => {
-        const d = p.time.slice(0, 10)
+        const d = new Date(p.time).toISOString().slice(0, 10)
         counts[d] = (counts[d] || 0) + 1
       })
 
       const merged = tempData.map(p => {
-        const d = p.time.slice(0, 10)
+        const d = new Date(p.time).toISOString().slice(0, 10)
 
         const rainVal = counts[d]
           ? rainMap[d] / counts[d]
@@ -197,18 +108,11 @@ export default function Page() {
         return {
           time: p.time,
           temperature: safe(p.temperature),
-          rain: rainVal > 0 ? rainVal : null // hide zero rain
+          rain: rainVal > 0 ? rainVal : null
         }
       })
 
-      // 🔒 FINAL GUARD (prevents ALL crashes)
-      const safeData = merged.filter(p =>
-        p.time &&
-        !isNaN(new Date(p.time).getTime()) &&
-        isFinite(p.temperature)
-      )
-
-      setData(safeData)
+      setData(merged)
     }
 
     fetchAll()
@@ -220,34 +124,13 @@ export default function Page() {
     }
   }, [range])
 
-  const ticks = useMemo(() => generateTicks(data), [data])
-
-  const midnightLines = ticks.filter(t => {
-    const d = new Date(t)
-    return !isNaN(d.getTime()) && d.getHours() === 0
-  })
-
   return (
     <div style={{ padding: 8 }}>
-      {/* RANGE BUTTONS */}
-      <div style={{
-        display: 'flex',
-        gap: 6,
-        marginBottom: 6,
-        justifyContent: 'center'
-      }}>
+
+      {/* BUTTONS */}
+      <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 6 }}>
         {[7, 14, 30].map(r => (
-          <button
-            key={r}
-            onClick={() => setRange(r)}
-            style={{
-              padding: '6px 10px',
-              borderRadius: 6,
-              border: '1px solid #e2e8f0',
-              background: range === r ? '#22c55e' : '#fff',
-              color: range === r ? '#fff' : '#64748b'
-            }}
-          >
+          <button key={r} onClick={() => setRange(r)}>
             {r}d
           </button>
         ))}
@@ -255,61 +138,28 @@ export default function Page() {
 
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
-          <CartesianGrid stroke="#cbd5e1" vertical={false} />
-
-          {midnightLines.map(t => (
-            <ReferenceLine key={t} x={t} stroke="#cbd5e1" strokeOpacity={0.6} />
-          ))}
-
-          <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
+          <CartesianGrid vertical={false} />
 
           <XAxis
             dataKey="time"
-            ticks={ticks}
-            interval={0}
-            tick={({ x, y, payload }) => {
-              const d = new Date(payload.value)
-              if (isNaN(d.getTime()) || d.getHours() !== 0) return null
-
-              const date = d.toLocaleDateString('sk-SK', {
-                timeZone: TZ,
+            type="number"
+            domain={['auto', 'auto']}
+            tickFormatter={(t) =>
+              new Date(t).toLocaleDateString('sk-SK', {
                 day: '2-digit',
-                month: '2-digit',
+                month: '2-digit'
               })
-
-              return (
-                <g transform={`translate(${x},${y})`}>
-                  <text y={10} textAnchor="middle" fontSize={11}>
-                    {date}
-                  </text>
-                </g>
-              )
-            }}
-            axisLine={false}
-            tickLine={false}
+            }
           />
 
-          <YAxis
-            yAxisId="temp"
-            tick={({ y, payload }) => (
-              <text x={4} y={y + 3} fontSize={11}>
-                {payload.value}
-              </text>
-            )}
-            axisLine={false}
-            tickLine={false}
-            width={30}
-          />
+          <YAxis yAxisId="temp" />
+          <YAxis yAxisId="rain" orientation="right" />
 
-          <YAxis
-            yAxisId="rain"
-            orientation="right"
-            axisLine={false}
-            tickLine={false}
-            width={30}
+          <Tooltip
+            labelFormatter={(l) =>
+              new Date(l).toLocaleString('sk-SK')
+            }
           />
-
-          <Tooltip content={<CustomTooltip />} />
 
           <Bar yAxisId="rain" dataKey="rain" barSize={6} />
 
@@ -325,7 +175,6 @@ export default function Page() {
             type="monotone"
             dataKey="temperature"
             stroke="#22c55e"
-            strokeWidth={2}
             dot={false}
           />
         </LineChart>

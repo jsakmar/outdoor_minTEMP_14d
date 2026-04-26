@@ -124,11 +124,22 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   const rain = safe(payload.find((p: any) => p.dataKey === 'rain')?.value)
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', padding: 6 }}>
-      <div style={{ fontSize: 11 }}>{time}</div>
-      <div style={{ color: '#22c55e' }}>{temp.toFixed(1)}°C</div>
+    <div style={{
+      background: '#fff',
+      border: '1px solid #e2e8f0',
+      borderRadius: 6,
+      padding: '6px 8px'
+    }}>
+      <div style={{ fontSize: 11, color: '#64748b' }}>{time}</div>
+
+      <div style={{ fontWeight: 600, color: '#22c55e' }}>
+        {temp.toFixed(1)}°C
+      </div>
+
       {rain > 0 && (
-        <div style={{ color: '#0ea5e9' }}>☔ {rain.toFixed(2)} mm</div>
+        <div style={{ fontSize: 11, color: '#0ea5e9' }}>
+          ☔ {rain.toFixed(2)} mm
+        </div>
       )}
     </div>
   )
@@ -186,11 +197,11 @@ export default function Page() {
         return {
           time: p.time,
           temperature: safe(p.temperature),
-          rain: rainVal > 0 ? rainVal : null // 👈 hide zero bars
+          rain: rainVal > 0 ? rainVal : null // hide zero rain
         }
       })
 
-      // 🔒 FINAL HARD GUARD (prevents ALL crashes)
+      // 🔒 FINAL GUARD (prevents ALL crashes)
       const safeData = merged.filter(p =>
         p.time &&
         !isNaN(new Date(p.time).getTime()) &&
@@ -211,27 +222,112 @@ export default function Page() {
 
   const ticks = useMemo(() => generateTicks(data), [data])
 
+  const midnightLines = ticks.filter(t => {
+    const d = new Date(t)
+    return !isNaN(d.getTime()) && d.getHours() === 0
+  })
+
   return (
     <div style={{ padding: 8 }}>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+      {/* RANGE BUTTONS */}
+      <div style={{
+        display: 'flex',
+        gap: 6,
+        marginBottom: 6,
+        justifyContent: 'center'
+      }}>
         {[7, 14, 30].map(r => (
-          <button key={r} onClick={() => setRange(r)}>{r}d</button>
+          <button
+            key={r}
+            onClick={() => setRange(r)}
+            style={{
+              padding: '6px 10px',
+              borderRadius: 6,
+              border: '1px solid #e2e8f0',
+              background: range === r ? '#22c55e' : '#fff',
+              color: range === r ? '#fff' : '#64748b'
+            }}
+          >
+            {r}d
+          </button>
         ))}
       </div>
 
       <ResponsiveContainer width="100%" height={300}>
         <LineChart data={data}>
-          <CartesianGrid vertical={false} />
+          <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
-          <XAxis dataKey="time" ticks={ticks} interval={0} />
-          <YAxis yAxisId="temp" width={30} />
-          <YAxis yAxisId="rain" orientation="right" width={30} />
+          {midnightLines.map(t => (
+            <ReferenceLine key={t} x={t} stroke="#cbd5e1" strokeOpacity={0.6} />
+          ))}
+
+          <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
+
+          <XAxis
+            dataKey="time"
+            ticks={ticks}
+            interval={0}
+            tick={({ x, y, payload }) => {
+              const d = new Date(payload.value)
+              if (isNaN(d.getTime()) || d.getHours() !== 0) return null
+
+              const date = d.toLocaleDateString('sk-SK', {
+                timeZone: TZ,
+                day: '2-digit',
+                month: '2-digit',
+              })
+
+              return (
+                <g transform={`translate(${x},${y})`}>
+                  <text y={10} textAnchor="middle" fontSize={11}>
+                    {date}
+                  </text>
+                </g>
+              )
+            }}
+            axisLine={false}
+            tickLine={false}
+          />
+
+          <YAxis
+            yAxisId="temp"
+            tick={({ y, payload }) => (
+              <text x={4} y={y + 3} fontSize={11}>
+                {payload.value}
+              </text>
+            )}
+            axisLine={false}
+            tickLine={false}
+            width={30}
+          />
+
+          <YAxis
+            yAxisId="rain"
+            orientation="right"
+            axisLine={false}
+            tickLine={false}
+            width={30}
+          />
 
           <Tooltip content={<CustomTooltip />} />
 
           <Bar yAxisId="rain" dataKey="rain" barSize={6} />
-          <Area yAxisId="temp" dataKey="temperature" />
-          <Line yAxisId="temp" dataKey="temperature" dot={false} />
+
+          <Area
+            yAxisId="temp"
+            type="monotone"
+            dataKey="temperature"
+            fill="rgba(59,130,246,0.12)"
+          />
+
+          <Line
+            yAxisId="temp"
+            type="monotone"
+            dataKey="temperature"
+            stroke="#22c55e"
+            strokeWidth={2}
+            dot={false}
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

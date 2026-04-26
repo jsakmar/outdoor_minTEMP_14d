@@ -5,7 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip,
   ResponsiveContainer, ReferenceLine, Area,
-  CartesianGrid, Bar,
+  CartesianGrid, Bar, LabelList
 } from 'recharts'
 
 const supabase = createClient(
@@ -41,8 +41,8 @@ function aggregate15min(data: Row[]): ChartPoint[] {
     if (isNaN(d.getTime())) return
 
     d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0)
-    const key = d.toISOString()
 
+    const key = d.toISOString()
     if (!buckets[key]) buckets[key] = []
     buckets[key].push(row.temperature)
   })
@@ -59,7 +59,6 @@ function aggregate15min(data: Row[]): ChartPoint[] {
 // ---------- smoothing ----------
 function smooth(data: ChartPoint[]): ChartPoint[] {
   const w = 3
-
   return data.map((p, i) => {
     const slice = data.slice(
       Math.max(0, i - w),
@@ -107,10 +106,21 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   const rain = payload.find((p: any) => p.dataKey === 'rain')?.value ?? 0
 
   return (
-    <div style={{ background: '#fff', border: '1px solid #e2e8f0', padding: 6 }}>
-      <div style={{ fontSize: 11 }}>{time}</div>
-      <div style={{ color: '#22c55e' }}>{temp}°C</div>
-      <div style={{ color: '#0ea5e9' }}>{rain.toFixed(2)} mm</div>
+    <div style={{
+      background: '#fff',
+      border: '1px solid #e2e8f0',
+      borderRadius: 6,
+      padding: '6px 8px'
+    }}>
+      <div style={{ fontSize: 10, color: '#64748b' }}>{time}</div>
+
+      <div style={{ fontSize: 12, color: '#0ea5e9' }}>
+        {rain.toFixed(2)} mm
+      </div>
+
+      <div style={{ fontWeight: 700, fontSize: 14, color: '#16f2a5' }}>
+        {temp}°C
+      </div>
     </div>
   )
 }
@@ -146,7 +156,6 @@ export default function Page() {
 
       const tempData = smooth(aggregate15min(tempRaw ?? []))
 
-      // ---------- DAILY RAIN SPIKES ----------
       const rainMap: Record<string, number> = {}
       ;(rainRaw as RainRow[] || []).forEach(r => {
         rainMap[r.day] = typeof r.rain_sum === 'number' ? r.rain_sum : 0
@@ -154,10 +163,8 @@ export default function Page() {
 
       const merged = tempData.map(p => {
         const d = p.time.slice(0, 10)
-
         const hour = new Date(p.time).getHours()
 
-        // 👉 only show rain once per day at ~12:00
         if (hour === 12) {
           const rainVal = rainMap[d] || 0
           return {
@@ -175,126 +182,66 @@ export default function Page() {
     fetchAll()
     const interval = setInterval(fetchAll, 4 * 60 * 1000)
 
-    if (!channelRef.current) {
-      channelRef.current = supabase
-        .channel('realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'netatmo_measurements' }, fetchAll)
-        .subscribe()
-    }
-
     return () => {
       mounted = false
       clearInterval(interval)
-      if (channelRef.current) supabase.removeChannel(channelRef.current)
     }
   }, [range])
-
-  const stats = useMemo(() => {
-    if (!data.length) return null
-
-    const temps = data.map(d => d.temperature)
-
-    // IMPORTANT: compute from raw rainMap logic instead
-    const rainTotal = data.reduce((s, d) => s + (d.rain || 0), 0)
-
-    return {
-      min: Math.min(...temps).toFixed(1),
-      max: Math.max(...temps).toFixed(1),
-      rain: rainTotal
-    }
-  }, [data])
 
   const ticks = useMemo(() => generateTicks(data), [data])
   const midnightLines = ticks.filter(t => new Date(t).getHours() === 0)
 
   return (
-    <div style={{
-      height: 280,
-      overflow: 'hidden',
-      padding: 8,
-      boxSizing: 'border-box'
-    }}>
+    <div style={{ width: '100%', height: 280 }}>
 
-      {/* BUTTONS */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
-        {[7, 14, 30].map(r => (
-          <button
-            key={r}
-            onClick={() => setRange(r)}
-            style={{
-              flex: 1,
-              padding: '6px 0',
-              borderRadius: 8,
-              border: '1px solid #e2e8f0',
-              background: range === r ? '#22c55e' : '#fff',
-              color: range === r ? '#fff' : '#64748b',
-              fontSize: 12
-            }}
-          >
-            <div>{r}d</div>
-
-            {stats && range === r && (
-              <div style={{
-                fontSize: 10,
-                display: 'flex',
-                justifyContent: 'center',
-                gap: 6
-              }}>
-                <span>↓{stats.min}</span>
-                <span>↑{stats.max}</span>
-                <span>☔{stats.rain.toFixed(1)}mm</span>
-              </div>
-            )}
-          </button>
-        ))}
-      </div>
-
-      <ResponsiveContainer width="100%" height={220}>
+      <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data}>
-          <CartesianGrid stroke="#cbd5e1" vertical={false} />
+          <CartesianGrid stroke="#1e293b" vertical={false} />
 
           {midnightLines.map(t => (
-            <ReferenceLine key={t} x={t} stroke="#cbd5e1" strokeOpacity={0.6} />
+            <ReferenceLine key={t} x={t} stroke="#334155" />
           ))}
-
-          <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
 
           <XAxis
             dataKey="time"
             ticks={ticks}
             interval={0}
-            tick={({ x, y, payload }) => {
-              const d = new Date(payload.value)
-              if (isNaN(d.getTime()) || d.getHours() !== 0) return null
-
-              const date = d.toLocaleDateString('sk-SK', {
-                timeZone: TZ,
-                day: '2-digit',
-                month: '2-digit',
-              })
-
-              return (
-                <g transform={`translate(${x},${y})`}>
-                  <text y={10} textAnchor="middle" fontSize={11} fontWeight={600}>
-                    {date}
-                  </text>
-                </g>
-              )
-            }}
-            axisLine={false}
             tickLine={false}
+            axisLine={false}
           />
 
-          <YAxis width={30} />
+          <YAxis
+            axisLine={false}
+            tickLine={false}
+            width={30}
+            tick={{ fill: '#94a3b8', fontSize: 11 }}
+          />
 
           <Tooltip content={<CustomTooltip />} />
 
-          {/* 🌧️ DAILY SPIKE */}
           <Bar dataKey="rain" fill="#38bdf8" barSize={8} />
 
-          <Area type="monotone" dataKey="temperature" fill="rgba(59,130,246,0.12)" />
+          <Area
+            type="monotone"
+            dataKey="temperature"
+            fill="rgba(16,185,129,0.1)"
+          />
 
-          <Line type="monotone" dataKey="temperature" stroke="#22c55e" dot={false} />
+          <Line
+            type="monotone"
+            dataKey="temperature"
+            stroke="#16f2a5"
+            strokeWidth={2.5}
+            dot={false}
+          >
+            {/* VALUE LABELS */}
+            <LabelList
+              dataKey="temperature"
+              position="top"
+              formatter={(v: number) => `${Math.round(v)}°`}
+              style={{ fontSize: 10, fill: '#16f2a5' }}
+            />
+          </Line>
         </LineChart>
       </ResponsiveContainer>
     </div>

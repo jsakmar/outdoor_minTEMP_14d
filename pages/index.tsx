@@ -110,7 +110,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       borderRadius: 6,
       padding: '6px 8px'
     }}>
-      {/* ORDER FIXED */}
       <div style={{ fontSize: 10, color: '#64748b' }}>{time}</div>
 
       <div style={{ fontWeight: 700, fontSize: 14, color: '#22c55e' }}>
@@ -206,12 +205,12 @@ export default function Page() {
 
   return (
     <div style={{
-      width: '100vw',
+      width: '100%',
+      maxWidth: 900,        // 👈 desktop constraint
+      margin: '0 auto',
       height: 280,
-      margin: 0,
       padding: '6px 0 0 0',
-      boxSizing: 'border-box',
-      overflow: 'hidden'
+      boxSizing: 'border-box'
     }}>
 
       {/* BUTTONS */}
@@ -253,9 +252,8 @@ export default function Page() {
         ))}
       </div>
 
-      {/* CHART */}
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+        <LineChart data={data} margin={{ top: 12, right: 0, left: 0, bottom: 0 }}>
 
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
@@ -283,7 +281,13 @@ export default function Page() {
 
               return (
                 <g transform={`translate(${x},${y})`}>
-                  <text y={-14} textAnchor="middle" fill="#64748b" fontSize={11} fontWeight={600}>
+                  <text
+                    y={-8}   // 👈 safe + visible
+                    textAnchor="middle"
+                    fill="#64748b"
+                    fontSize={11}
+                    fontWeight={600}
+                  >
                     {date}
                   </text>
                 </g>
@@ -306,7 +310,6 @@ export default function Page() {
 
           <Bar dataKey="rain" fill="#38bdf8" barSize={8} />
 
-          {/* PREMIUM GRADIENT FEEL */}
           <Area
             type="monotone"
             dataKey="temperature"

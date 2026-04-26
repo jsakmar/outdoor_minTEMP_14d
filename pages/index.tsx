@@ -64,7 +64,6 @@ function smooth(data: ChartPoint[]): ChartPoint[] {
       Math.max(0, i - w),
       Math.min(data.length, i + w + 1)
     )
-
     const avg = slice.reduce((s, x) => s + x.temperature, 0) / slice.length
     return { ...p, temperature: Number(avg.toFixed(1)) }
   })
@@ -111,14 +110,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       borderRadius: 6,
       padding: '6px 8px'
     }}>
+      {/* ORDER FIXED */}
       <div style={{ fontSize: 10, color: '#64748b' }}>{time}</div>
-
-      <div style={{ fontSize: 12, color: '#0ea5e9' }}>
-        {rain.toFixed(2)} mm
-      </div>
 
       <div style={{ fontWeight: 700, fontSize: 14, color: '#22c55e' }}>
         {temp}°C
+      </div>
+
+      <div style={{ fontSize: 12, color: '#0ea5e9' }}>
+        {rain.toFixed(2)} mm
       </div>
     </div>
   )
@@ -159,27 +159,18 @@ export default function Page() {
         rainMap[r.day] = typeof r.rain_sum === 'number' ? r.rain_sum : 0
       })
 
-      // ---------- HYBRID RAIN MODEL ----------
       const merged = tempData.map(p => {
         const d = p.time.slice(0, 10)
         const hour = new Date(p.time).getHours()
         const total = rainMap[d] || 0
 
-        // --- 7d: cumulative bars ---
         if (range === 7) {
           const rainVal = total * (hour / 24)
-          return {
-            ...p,
-            rain: rainVal > 0.4 ? rainVal : null
-          }
+          return { ...p, rain: rainVal > 0.4 ? rainVal : null }
         }
 
-        // --- 14d / 30d: one bar per day ---
         if (hour === 23) {
-          return {
-            ...p,
-            rain: total > 0.4 ? total : null
-          }
+          return { ...p, rain: total > 0.4 ? total : null }
         }
 
         return { ...p, rain: null }
@@ -214,10 +205,22 @@ export default function Page() {
   const midnightLines = ticks.filter(t => new Date(t).getHours() === 0)
 
   return (
-    <div style={{ height: 280, padding: 8 }}>
+    <div style={{
+      width: '100vw',
+      height: 280,
+      margin: 0,
+      padding: '6px 0 0 0',
+      boxSizing: 'border-box',
+      overflow: 'hidden'
+    }}>
 
       {/* BUTTONS */}
-      <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
+      <div style={{
+        display: 'flex',
+        gap: 6,
+        marginBottom: 4,
+        padding: '0 6px'
+      }}>
         {[7, 14, 30].map(r => (
           <button
             key={r}
@@ -251,8 +254,9 @@ export default function Page() {
       </div>
 
       {/* CHART */}
-      <ResponsiveContainer width="100%" height={220}>
-        <LineChart data={data}>
+      <ResponsiveContainer width="100%" height="100%">
+        <LineChart data={data} margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
+
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
           {midnightLines.map(t => (
@@ -265,6 +269,8 @@ export default function Page() {
             dataKey="time"
             ticks={ticks}
             interval={0}
+            axisLine={false}
+            tickLine={false}
             tick={({ x, y, payload }) => {
               const d = new Date(payload.value)
               if (isNaN(d.getTime()) || d.getHours() !== 0) return null
@@ -277,20 +283,12 @@ export default function Page() {
 
               return (
                 <g transform={`translate(${x},${y})`}>
-                  <text
-                    y={-12}   // ← higher position
-                    textAnchor="middle"
-                    fill="#64748b"
-                    fontSize={11}
-                    fontWeight={600}
-                  >
+                  <text y={-14} textAnchor="middle" fill="#64748b" fontSize={11} fontWeight={600}>
                     {date}
                   </text>
                 </g>
               )
             }}
-            axisLine={false}
-            tickLine={false}
           />
 
           <YAxis
@@ -298,17 +296,21 @@ export default function Page() {
             tickLine={false}
             width={30}
             tick={{ fill: '#64748b', fontSize: 11 }}
+            domain={[
+              (min: number) => Math.floor(min - 2),
+              (max: number) => Math.ceil(max + 2)
+            ]}
           />
 
           <Tooltip content={<CustomTooltip />} />
 
-          {/* 🌧️ BARS ONLY */}
           <Bar dataKey="rain" fill="#38bdf8" barSize={8} />
 
+          {/* PREMIUM GRADIENT FEEL */}
           <Area
             type="monotone"
             dataKey="temperature"
-            fill="rgba(59,130,246,0.12)"
+            fill="rgba(34,197,94,0.08)"
           />
 
           <Line

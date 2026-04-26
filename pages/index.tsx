@@ -41,8 +41,8 @@ function aggregate15min(data: Row[]): ChartPoint[] {
     if (isNaN(d.getTime())) return
 
     d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0)
-
     const key = d.toISOString()
+
     if (!buckets[key]) buckets[key] = []
     buckets[key].push(row.temperature)
   })
@@ -66,7 +66,6 @@ function smooth(data: ChartPoint[]): ChartPoint[] {
     )
 
     const avg = slice.reduce((s, x) => s + x.temperature, 0) / slice.length
-
     return { ...p, temperature: Number(avg.toFixed(1)) }
   })
 }
@@ -138,7 +137,6 @@ export default function Page() {
       const sinceISO = sinceDate.toISOString()
       const sinceDay = sinceISO.slice(0, 10)
 
-      // temp
       const { data: tempRaw } = await supabase
         .from('netatmo_measurements')
         .select('time, temperature, module_name')
@@ -147,7 +145,6 @@ export default function Page() {
         .not('temperature', 'is', null)
         .order('time', { ascending: true })
 
-      // rain
       const { data: rainRaw } = await supabase
         .from('netatmo_daily_stats')
         .select('day, rain_sum')
@@ -157,22 +154,31 @@ export default function Page() {
 
       const tempData = smooth(aggregate15min(tempRaw ?? []))
 
-      // map rain per day
       const rainMap: Record<string, number> = {}
       ;(rainRaw as RainRow[] || []).forEach(r => {
         rainMap[r.day] = typeof r.rain_sum === 'number' ? r.rain_sum : 0
       })
 
-      // merge as DAILY SPIKE (at 12:00)
+      // ---------- HYBRID RAIN MODEL ----------
       const merged = tempData.map(p => {
         const d = p.time.slice(0, 10)
         const hour = new Date(p.time).getHours()
+        const total = rainMap[d] || 0
 
-        if (hour === 12) {
-          const rainVal = rainMap[d] || 0
+        // --- 7d: cumulative bars ---
+        if (range === 7) {
+          const rainVal = total * (hour / 24)
           return {
             ...p,
             rain: rainVal > 0.4 ? rainVal : null
+          }
+        }
+
+        // --- 14d / 30d: one bar per day ---
+        if (hour === 23) {
+          return {
+            ...p,
+            rain: total > 0.4 ? total : null
           }
         }
 
@@ -191,7 +197,6 @@ export default function Page() {
     }
   }, [range])
 
-  // ---------- stats ----------
   const stats = useMemo(() => {
     if (!data.length) return null
 
@@ -209,11 +214,7 @@ export default function Page() {
   const midnightLines = ticks.filter(t => new Date(t).getHours() === 0)
 
   return (
-    <div style={{
-      height: 280,
-      padding: 8,
-      boxSizing: 'border-box'
-    }}>
+    <div style={{ height: 280, padding: 8 }}>
 
       {/* BUTTONS */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
@@ -277,7 +278,7 @@ export default function Page() {
               return (
                 <g transform={`translate(${x},${y})`}>
                   <text
-                    y={-5}  // inside chart
+                    y={-12}   // ← higher position
                     textAnchor="middle"
                     fill="#64748b"
                     fontSize={11}
@@ -301,6 +302,7 @@ export default function Page() {
 
           <Tooltip content={<CustomTooltip />} />
 
+          {/* 🌧️ BARS ONLY */}
           <Bar dataKey="rain" fill="#38bdf8" barSize={8} />
 
           <Area

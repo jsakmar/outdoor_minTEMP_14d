@@ -207,17 +207,12 @@ export default function Page() {
       maxWidth: 1150,
       margin: '0 auto',
       height: 280,
-      padding: '6px 0 0 0',
+      paddingTop: 6,
       boxSizing: 'border-box'
     }}>
 
       {/* buttons */}
-      <div style={{
-        display: 'flex',
-        gap: 6,
-        marginBottom: 4,
-        padding: '0 6px'
-      }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 4, padding: '0 6px' }}>
         {[7, 14, 30].map(r => (
           <button
             key={r}
@@ -243,7 +238,8 @@ export default function Page() {
       </div>
 
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 16, left: 0, right: 0, bottom: 0 }}>
+        <LineChart data={data} margin={{ top: 16 }}>
+
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
           {midnightLines.map(t => (
@@ -276,9 +272,17 @@ export default function Page() {
             axisLine={false}
             tickLine={false}
             width={30}
+            tick={{ fill: '#000', fontSize: 11 }}
             domain={([min, max]) => {
-              const abs = Math.max(Math.abs(min), Math.abs(max))
-              return [-abs - 2, abs + 2]
+              const buffer = 2
+
+              if (min >= 0) return [0, Math.ceil(max + buffer)]
+              if (max <= 0) return [Math.floor(min - buffer), 0]
+
+              return [
+                Math.floor(min - buffer),
+                Math.ceil(max + buffer)
+              ]
             }}
           />
 

@@ -28,7 +28,7 @@ type Row = {
 
 type RainRow = {
   day: string
-  rain_sum: number
+  rain_sum: number | null
 }
 
 type ChartPoint = {
@@ -140,6 +140,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
     minute: '2-digit',
   })
 
+  const tempVal =
+    payload.find((p: any) => p.dataKey === 'temperature')?.value ?? 0
+
+  const rainVal =
+    payload.find((p: any) => p.dataKey === 'rain')?.value ?? 0
+
   return (
     <div style={{
       background: '#fff',
@@ -150,11 +156,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div style={{ fontSize: 11, color: '#64748b' }}>{time}</div>
 
       <div style={{ fontWeight: 600, color: '#22c55e' }}>
-        {payload.find((p: any) => p.dataKey === 'temperature')?.value}°C
+        {Number(tempVal).toFixed(1)}°C
       </div>
 
       <div style={{ fontSize: 11, color: '#0ea5e9' }}>
-        ☔ {payload.find((p: any) => p.dataKey === 'rain')?.value?.toFixed(2)} mm
+        ☔ {Number(rainVal).toFixed(2)} mm
       </div>
     </div>
   )
@@ -164,7 +170,6 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function Page() {
   const [data, setData] = useState<ChartPoint[]>([])
   const [range, setRange] = useState(7)
-  const channelRef = useRef<any>(null)
 
   useEffect(() => {
     let mounted = true
@@ -192,25 +197,32 @@ export default function Page() {
 
       if (!mounted) return
 
-      const tempData = smooth(aggregate15min(tempRaw as Row[]))
+      const tempData = smooth(aggregate15min(tempRaw ?? []))
 
-      const rainMap = Object.fromEntries(
-        (rainRaw as RainRow[]).map(r => [r.day, r.rain_sum || 0])
-      )
+      // --- safe rain map ---
+      const rainMap: Record<string, number> = {}
+      ;(rainRaw as RainRow[] || []).forEach(r => {
+        const val = Number(r.rain_sum)
+        rainMap[r.day] = isNaN(val) ? 0 : val
+      })
 
-      // count points per day
+      // --- counts per day ---
       const counts: Record<string, number> = {}
       tempData.forEach(p => {
         const d = p.time.slice(0, 10)
         counts[d] = (counts[d] || 0) + 1
       })
 
-      // merge + distribute
+      // --- merge safely ---
       const merged = tempData.map(p => {
         const d = p.time.slice(0, 10)
+
+        const rainVal =
+          counts[d] ? (rainMap[d] ?? 0) / counts[d] : 0
+
         return {
           ...p,
-          rain: (rainMap[d] || 0) / counts[d]
+          rain: isNaN(rainVal) ? 0 : rainVal
         }
       })
 
@@ -308,12 +320,7 @@ export default function Page() {
 
           <Tooltip content={<CustomTooltip />} />
 
-          {/* rain bars */}
-          <Bar
-            yAxisId="rain"
-            dataKey="rain"
-            barSize={6}
-          />
+          <Bar yAxisId="rain" dataKey="rain" barSize={6} />
 
           <Area
             yAxisId="temp"

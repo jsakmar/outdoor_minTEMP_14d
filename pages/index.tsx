@@ -111,11 +111,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       padding: '6px 8px'
     }}>
       <div style={{ fontSize: 10, color: '#64748b' }}>{time}</div>
-
       <div style={{ fontWeight: 700, fontSize: 14, color: '#22c55e' }}>
         {temp}°C
       </div>
-
       <div style={{ fontSize: 12, color: '#0ea5e9' }}>
         {rain.toFixed(2)} mm
       </div>
@@ -206,14 +204,14 @@ export default function Page() {
   return (
     <div style={{
       width: '100%',
-      maxWidth: 900,        // 👈 desktop constraint
+      maxWidth: 740,
       margin: '0 auto',
       height: 280,
       padding: '6px 0 0 0',
       boxSizing: 'border-box'
     }}>
 
-      {/* BUTTONS */}
+      {/* buttons */}
       <div style={{
         display: 'flex',
         gap: 6,
@@ -235,17 +233,9 @@ export default function Page() {
             }}
           >
             <div>{r}d</div>
-
             {stats && range === r && (
-              <div style={{
-                fontSize: 10,
-                display: 'flex',
-                justifyContent: 'center',
-                gap: 6
-              }}>
-                <span>↓{stats.min}</span>
-                <span>↑{stats.max}</span>
-                <span>☔{stats.rain.toFixed(1)}mm</span>
+              <div style={{ fontSize: 10 }}>
+                ↓{stats.min} ↑{stats.max} ☔{stats.rain.toFixed(1)}mm
               </div>
             )}
           </button>
@@ -253,8 +243,7 @@ export default function Page() {
       </div>
 
       <ResponsiveContainer width="100%" height="100%">
-        <LineChart data={data} margin={{ top: 12, right: 0, left: 0, bottom: 0 }}>
-
+        <LineChart data={data} margin={{ top: 16, left: 0, right: 0, bottom: 0 }}>
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
           {midnightLines.map(t => (
@@ -273,22 +262,10 @@ export default function Page() {
               const d = new Date(payload.value)
               if (isNaN(d.getTime()) || d.getHours() !== 0) return null
 
-              const date = d.toLocaleDateString('sk-SK', {
-                timeZone: TZ,
-                day: '2-digit',
-                month: '2-digit',
-              })
-
               return (
                 <g transform={`translate(${x},${y})`}>
-                  <text
-                    y={-8}   // 👈 safe + visible
-                    textAnchor="middle"
-                    fill="#64748b"
-                    fontSize={11}
-                    fontWeight={600}
-                  >
-                    {date}
+                  <text y={-8} textAnchor="middle" fill="#64748b" fontSize={11}>
+                    {d.toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}
                   </text>
                 </g>
               )
@@ -299,30 +276,19 @@ export default function Page() {
             axisLine={false}
             tickLine={false}
             width={30}
-            tick={{ fill: '#64748b', fontSize: 11 }}
-            domain={[
-              (min: number) => Math.floor(min - 2),
-              (max: number) => Math.ceil(max + 2)
-            ]}
+            domain={([min, max]) => {
+              const abs = Math.max(Math.abs(min), Math.abs(max))
+              return [-abs - 2, abs + 2]
+            }}
           />
 
           <Tooltip content={<CustomTooltip />} />
 
           <Bar dataKey="rain" fill="#38bdf8" barSize={8} />
 
-          <Area
-            type="monotone"
-            dataKey="temperature"
-            fill="rgba(34,197,94,0.08)"
-          />
+          <Area type="monotone" dataKey="temperature" fill="rgba(34,197,94,0.08)" />
 
-          <Line
-            type="monotone"
-            dataKey="temperature"
-            stroke="#22c55e"
-            strokeWidth={2}
-            dot={false}
-          />
+          <Line type="monotone" dataKey="temperature" stroke="#22c55e" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

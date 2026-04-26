@@ -260,7 +260,7 @@ export default function Page() {
 
               return (
                 <g transform={`translate(${x},${y})`}>
-                  <text y={-8} textAnchor="middle" fill="#64748b" fontSize={11}>
+                  <text y={-12} textAnchor="middle" fill="#334155" fontSize={11}>
                     {d.toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}
                   </text>
                 </g>

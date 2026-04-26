@@ -3,9 +3,16 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip,
-  ResponsiveContainer, ReferenceLine, Area,
-  CartesianGrid, Bar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  Area,
+  CartesianGrid,
+  Bar,
 } from 'recharts'
 
 const supabase = createClient(
@@ -36,7 +43,7 @@ const TZ = 'Europe/Bratislava'
 function aggregate15min(data: Row[]): ChartPoint[] {
   const buckets: Record<string, number[]> = {}
 
-  data.forEach(row => {
+  data.forEach((row) => {
     const d = new Date(row.time)
     if (isNaN(d.getTime())) return
 
@@ -216,10 +223,15 @@ export default function Page() {
   const ticks = useMemo(() => generateTicks(data), [data])
   const midnightLines = ticks.filter(t => new Date(t).getHours() === 0)
 
-  const rainy = stats && stats.rain > 0.4
+  const isRainy = stats && stats.rain > 0.4
 
   return (
-    <div style={{ padding: 8 }}>
+    <div style={{
+      padding: 8,
+      height: '100vh',
+      overflow: 'hidden',
+      boxSizing: 'border-box'
+    }}>
 
       {/* BUTTONS */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 6 }}>
@@ -232,9 +244,10 @@ export default function Page() {
               padding: '8px 0',
               borderRadius: 8,
               border: '1px solid #e2e8f0',
-              background: range === r
-                ? (rainy ? '#0ea5e9' : '#22c55e')
-                : '#fff',
+              background:
+                range === r
+                  ? (isRainy ? '#0ea5e9' : '#22c55e')
+                  : '#fff',
               color: range === r ? '#fff' : '#64748b',
               fontSize: 12
             }}
@@ -250,17 +263,14 @@ export default function Page() {
               }}>
                 <span>↓{stats.min}</span>
                 <span>↑{stats.max}</span>
-
-                {stats.rain > 0.4 && (
-                  <span>☔{stats.rain.toFixed(1)}mm</span>
-                )}
+                <span>☔{stats.rain.toFixed(1)}mm</span>
               </div>
             )}
           </button>
         ))}
       </div>
 
-      <ResponsiveContainer width="100%" height={300}>
+      <ResponsiveContainer width="100%" height={260}>
         <LineChart data={data}>
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
@@ -302,19 +312,9 @@ export default function Page() {
 
           <Bar dataKey="rain" fill="#38bdf8" barSize={6} />
 
-          <Area
-            type="monotone"
-            dataKey="temperature"
-            fill="rgba(59,130,246,0.12)"
-          />
+          <Area type="monotone" dataKey="temperature" fill="rgba(59,130,246,0.12)" />
 
-          <Line
-            type="monotone"
-            dataKey="temperature"
-            stroke="#22c55e"
-            strokeWidth={2}
-            dot={false}
-          />
+          <Line type="monotone" dataKey="temperature" stroke="#22c55e" strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

@@ -3,21 +3,14 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  Area,
-  CartesianGrid,
-  Bar,
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, ReferenceLine, Area,
+  CartesianGrid, Bar,
 } from 'recharts'
 
 const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
 type Row = {
@@ -34,7 +27,7 @@ type RainRow = {
 type ChartPoint = {
   time: string
   temperature: number
-  rain?: number | null
+  rain: number
 }
 
 const TZ = 'Europe/Bratislava'
@@ -43,7 +36,7 @@ const TZ = 'Europe/Bratislava'
 function aggregate15min(data: Row[]): ChartPoint[] {
   const buckets: Record<string, number[]> = {}
 
-  data.forEach((row) => {
+  data.forEach(row => {
     const d = new Date(row.time)
     if (isNaN(d.getTime())) return
 
@@ -57,29 +50,28 @@ function aggregate15min(data: Row[]): ChartPoint[] {
   return Object.entries(buckets)
     .map(([time, temps]) => ({
       time,
-      temperature:
-        temps.reduce((a, b) => a + b, 0) / temps.length,
-      rain: null
+      temperature: temps.reduce((a, b) => a + b, 0) / temps.length,
+      rain: 0
     }))
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
 }
 
 // ---------- smoothing ----------
 function smooth(data: ChartPoint[]): ChartPoint[] {
-  const window = 3
+  const w = 3
 
-  return data.map((point, i) => {
-    const start = Math.max(0, i - window)
-    const end = Math.min(data.length - 1, i + window)
+  return data.map((p, i) => {
+    const slice = data.slice(
+      Math.max(0, i - w),
+      Math.min(data.length, i + w + 1)
+    )
 
-    const slice = data.slice(start, end + 1)
     const avg =
-      slice.reduce((sum, p) => sum + p.temperature, 0) /
-      slice.length
+      slice.reduce((s, x) => s + x.temperature, 0) / slice.length
 
     return {
-      ...point,
-      temperature: Number(avg.toFixed(1)),
+      ...p,
+      temperature: Number(avg.toFixed(1))
     }
   })
 }
@@ -92,12 +84,12 @@ function generateTicks(data: ChartPoint[]) {
   const end = new Date(data[data.length - 1].time)
 
   const ticks: string[] = []
-  const cursor = new Date(start)
-  cursor.setMinutes(0, 0, 0)
+  const c = new Date(start)
+  c.setMinutes(0, 0, 0)
 
-  while (cursor <= end) {
-    ticks.push(cursor.toISOString())
-    cursor.setHours(cursor.getHours() + 1)
+  while (c <= end) {
+    ticks.push(c.toISOString())
+    c.setHours(c.getHours() + 1)
   }
 
   return ticks
@@ -108,6 +100,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
 
   const d = new Date(label)
+
   const time = d.toLocaleTimeString('sk-SK', {
     timeZone: TZ,
     hour: '2-digit',
@@ -129,7 +122,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
         {temp}°C
       </div>
       <div style={{ fontSize: 11, color: '#0ea5e9' }}>
-        {Number(rain).toFixed(2)} mm
+        {rain.toFixed(2)} mm
       </div>
     </div>
   )
@@ -139,13 +132,12 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 export default function Page() {
   const [data, setData] = useState<ChartPoint[]>([])
   const [range, setRange] = useState(7)
-
   const channelRef = useRef<any>(null)
 
   useEffect(() => {
     let mounted = true
 
-    const fetchData = async () => {
+    const fetchAll = async () => {
       const sinceDate = new Date(Date.now() - range * 86400000)
       const sinceISO = sinceDate.toISOString()
       const sinceDay = sinceISO.slice(0, 10)
@@ -165,7 +157,7 @@ export default function Page() {
 
       if (!mounted) return
 
-      const tempData = smooth(aggregate15min(tempRaw as Row[]))
+      const tempData = smooth(aggregate15min(tempRaw ?? []))
 
       const rainMap: Record<string, number> = {}
       ;(rainRaw as RainRow[] || []).forEach(r => {
@@ -180,27 +172,24 @@ export default function Page() {
 
       const merged = tempData.map(p => {
         const d = p.time.slice(0, 10)
-
-        const rainVal = counts[d]
-          ? (rainMap[d] || 0) / counts[d]
-          : 0
+        const rainVal = counts[d] ? rainMap[d] / counts[d] : 0
 
         return {
           ...p,
-          rain: rainVal > 0 ? rainVal : null
+          rain: isFinite(rainVal) ? rainVal : 0
         }
       })
 
       setData(merged)
     }
 
-    fetchData()
-    const interval = setInterval(fetchData, 4 * 60 * 1000)
+    fetchAll()
+    const interval = setInterval(fetchAll, 4 * 60 * 1000)
 
     if (!channelRef.current) {
       channelRef.current = supabase
         .channel('realtime')
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'netatmo_measurements' }, fetchData)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'netatmo_measurements' }, fetchAll)
         .subscribe()
     }
 
@@ -215,7 +204,7 @@ export default function Page() {
     if (!data.length) return null
 
     const temps = data.map(d => d.temperature)
-    const rainTotal = data.reduce((sum, d) => sum + (d.rain || 0), 0)
+    const rainTotal = data.reduce((s, d) => s + d.rain, 0)
 
     return {
       min: Math.min(...temps).toFixed(1),
@@ -227,7 +216,7 @@ export default function Page() {
   const ticks = useMemo(() => generateTicks(data), [data])
   const midnightLines = ticks.filter(t => new Date(t).getHours() === 0)
 
-  const hasRain = stats && stats.rain > 0.4
+  const rainy = stats && stats.rain > 0.4
 
   return (
     <div style={{ padding: 8 }}>
@@ -243,18 +232,10 @@ export default function Page() {
               padding: '8px 0',
               borderRadius: 8,
               border: '1px solid #e2e8f0',
-              background:
-                range === r
-                  ? hasRain
-                    ? '#0ea5e9'
-                    : '#22c55e'
-                  : '#fff',
-              color:
-                range === r
-                  ? '#fff'
-                  : hasRain
-                  ? '#0ea5e9'
-                  : '#64748b',
+              background: range === r
+                ? (rainy ? '#0ea5e9' : '#22c55e')
+                : '#fff',
+              color: range === r ? '#fff' : '#64748b',
               fontSize: 12
             }}
           >
@@ -271,9 +252,7 @@ export default function Page() {
                 <span>↑{stats.max}</span>
 
                 {stats.rain > 0.4 && (
-                  <span style={{ color: '#38bdf8' }}>
-                    ☔{stats.rain.toFixed(1)}mm
-                  </span>
+                  <span>☔{stats.rain.toFixed(1)}mm</span>
                 )}
               </div>
             )}
@@ -285,21 +264,57 @@ export default function Page() {
         <LineChart data={data}>
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
-          {midnightLines.map((t) => (
+          {midnightLines.map(t => (
             <ReferenceLine key={t} x={t} stroke="#cbd5e1" strokeOpacity={0.6} />
           ))}
 
           <ReferenceLine y={0} stroke="#000" strokeWidth={1.5} />
 
-          <XAxis dataKey="time" ticks={ticks} interval={0} />
+          <XAxis
+            dataKey="time"
+            ticks={ticks}
+            interval={0}
+            tick={({ x, y, payload }) => {
+              const d = new Date(payload.value)
+              if (isNaN(d.getTime()) || d.getHours() !== 0) return null
+
+              const date = d.toLocaleDateString('sk-SK', {
+                timeZone: TZ,
+                day: '2-digit',
+                month: '2-digit',
+              })
+
+              return (
+                <g transform={`translate(${x},${y})`}>
+                  <text y={10} textAnchor="middle" fontSize={11} fontWeight={600}>
+                    {date}
+                  </text>
+                </g>
+              )
+            }}
+            axisLine={false}
+            tickLine={false}
+          />
+
           <YAxis width={30} />
 
           <Tooltip content={<CustomTooltip />} />
 
           <Bar dataKey="rain" fill="#38bdf8" barSize={6} />
 
-          <Area type="monotone" dataKey="temperature" fill="rgba(59,130,246,0.12)" />
-          <Line type="monotone" dataKey="temperature" stroke="#22c55e" dot={false} />
+          <Area
+            type="monotone"
+            dataKey="temperature"
+            fill="rgba(59,130,246,0.12)"
+          />
+
+          <Line
+            type="monotone"
+            dataKey="temperature"
+            stroke="#22c55e"
+            strokeWidth={2}
+            dot={false}
+          />
         </LineChart>
       </ResponsiveContainer>
     </div>

@@ -3,16 +3,9 @@
 import { useEffect, useState, useMemo, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  Area,
-  CartesianGrid,
-  Bar,
+  LineChart, Line, XAxis, YAxis, Tooltip,
+  ResponsiveContainer, ReferenceLine, Area,
+  CartesianGrid, Bar,
 } from 'recharts'
 
 const supabase = createClient(
@@ -34,7 +27,7 @@ type RainRow = {
 type ChartPoint = {
   time: string
   temperature: number
-  rain: number
+  rain: number | null
 }
 
 const TZ = 'Europe/Bratislava'
@@ -43,13 +36,13 @@ const TZ = 'Europe/Bratislava'
 function aggregate15min(data: Row[]): ChartPoint[] {
   const buckets: Record<string, number[]> = {}
 
-  data.forEach((row) => {
+  data.forEach(row => {
     const d = new Date(row.time)
     if (isNaN(d.getTime())) return
 
     d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0)
-
     const key = d.toISOString()
+
     if (!buckets[key]) buckets[key] = []
     buckets[key].push(row.temperature)
   })
@@ -58,7 +51,7 @@ function aggregate15min(data: Row[]): ChartPoint[] {
     .map(([time, temps]) => ({
       time,
       temperature: temps.reduce((a, b) => a + b, 0) / temps.length,
-      rain: 0
+      rain: null
     }))
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
 }
@@ -73,13 +66,9 @@ function smooth(data: ChartPoint[]): ChartPoint[] {
       Math.min(data.length, i + w + 1)
     )
 
-    const avg =
-      slice.reduce((s, x) => s + x.temperature, 0) / slice.length
+    const avg = slice.reduce((s, x) => s + x.temperature, 0) / slice.length
 
-    return {
-      ...p,
-      temperature: Number(avg.toFixed(1))
-    }
+    return { ...p, temperature: Number(avg.toFixed(1)) }
   })
 }
 
@@ -118,19 +107,10 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   const rain = payload.find((p: any) => p.dataKey === 'rain')?.value ?? 0
 
   return (
-    <div style={{
-      background: '#fff',
-      border: '1px solid #e2e8f0',
-      borderRadius: 6,
-      padding: '6px 8px'
-    }}>
-      <div style={{ fontSize: 11, color: '#64748b' }}>{time}</div>
-      <div style={{ fontWeight: 600, color: '#22c55e' }}>
-        {temp}°C
-      </div>
-      <div style={{ fontSize: 11, color: '#0ea5e9' }}>
-        {rain.toFixed(2)} mm
-      </div>
+    <div style={{ background: '#fff', border: '1px solid #e2e8f0', padding: 6 }}>
+      <div style={{ fontSize: 11 }}>{time}</div>
+      <div style={{ color: '#22c55e' }}>{temp}°C</div>
+      <div style={{ color: '#0ea5e9' }}>{rain.toFixed(2)} mm</div>
     </div>
   )
 }
@@ -166,25 +146,27 @@ export default function Page() {
 
       const tempData = smooth(aggregate15min(tempRaw ?? []))
 
+      // ---------- DAILY RAIN SPIKES ----------
       const rainMap: Record<string, number> = {}
       ;(rainRaw as RainRow[] || []).forEach(r => {
         rainMap[r.day] = typeof r.rain_sum === 'number' ? r.rain_sum : 0
       })
 
-      const counts: Record<string, number> = {}
-      tempData.forEach(p => {
-        const d = p.time.slice(0, 10)
-        counts[d] = (counts[d] || 0) + 1
-      })
-
       const merged = tempData.map(p => {
         const d = p.time.slice(0, 10)
-        const rainVal = counts[d] ? rainMap[d] / counts[d] : 0
 
-        return {
-          ...p,
-          rain: isFinite(rainVal) ? rainVal : 0
+        const hour = new Date(p.time).getHours()
+
+        // 👉 only show rain once per day at ~12:00
+        if (hour === 12) {
+          const rainVal = rainMap[d] || 0
+          return {
+            ...p,
+            rain: rainVal > 0.4 ? rainVal : null
+          }
         }
+
+        return { ...p, rain: null }
       })
 
       setData(merged)
@@ -211,7 +193,9 @@ export default function Page() {
     if (!data.length) return null
 
     const temps = data.map(d => d.temperature)
-    const rainTotal = data.reduce((s, d) => s + d.rain, 0)
+
+    // IMPORTANT: compute from raw rainMap logic instead
+    const rainTotal = data.reduce((s, d) => s + (d.rain || 0), 0)
 
     return {
       min: Math.min(...temps).toFixed(1),
@@ -223,13 +207,11 @@ export default function Page() {
   const ticks = useMemo(() => generateTicks(data), [data])
   const midnightLines = ticks.filter(t => new Date(t).getHours() === 0)
 
-  const isRainy = stats && stats.rain > 0.4
-
   return (
     <div style={{
-      padding: 8,
-      height: '100vh',
+      height: 280,
       overflow: 'hidden',
+      padding: 8,
       boxSizing: 'border-box'
     }}>
 
@@ -241,13 +223,10 @@ export default function Page() {
             onClick={() => setRange(r)}
             style={{
               flex: 1,
-              padding: '8px 0',
+              padding: '6px 0',
               borderRadius: 8,
               border: '1px solid #e2e8f0',
-              background:
-                range === r
-                  ? (isRainy ? '#0ea5e9' : '#22c55e')
-                  : '#fff',
+              background: range === r ? '#22c55e' : '#fff',
               color: range === r ? '#fff' : '#64748b',
               fontSize: 12
             }}
@@ -270,7 +249,7 @@ export default function Page() {
         ))}
       </div>
 
-      <ResponsiveContainer width="100%" height={260}>
+      <ResponsiveContainer width="100%" height={220}>
         <LineChart data={data}>
           <CartesianGrid stroke="#cbd5e1" vertical={false} />
 
@@ -310,11 +289,12 @@ export default function Page() {
 
           <Tooltip content={<CustomTooltip />} />
 
-          <Bar dataKey="rain" fill="#38bdf8" barSize={6} />
+          {/* 🌧️ DAILY SPIKE */}
+          <Bar dataKey="rain" fill="#38bdf8" barSize={8} />
 
           <Area type="monotone" dataKey="temperature" fill="rgba(59,130,246,0.12)" />
 
-          <Line type="monotone" dataKey="temperature" stroke="#22c55e" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="temperature" stroke="#22c55e" dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </div>

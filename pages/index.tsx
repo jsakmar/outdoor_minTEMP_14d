@@ -12,7 +12,6 @@ import {
   ReferenceLine,
   Area,
   CartesianGrid,
-  Bar,
 } from 'recharts'
 
 const supabase = createClient(
@@ -209,11 +208,9 @@ const CustomTooltip = ({
         'temperature'
     )?.value
 
+  // rain comes directly from row data
   const rain =
-    payload.find(
-      (p: any) =>
-        p.dataKey === 'rain'
-    )?.value
+    payload?.[0]?.payload?.rain
 
   return (
     <div
@@ -290,7 +287,7 @@ export default function Page() {
             10
           )
 
-        // ---------- temperatures ----------
+        // temperatures
         const {
           data: tempRaw
         } = await supabase
@@ -320,7 +317,7 @@ export default function Page() {
             }
           )
 
-        // ---------- rain ----------
+        // rain
         const {
           data: rainRaw
         } = await supabase
@@ -378,7 +375,7 @@ export default function Page() {
                 rainMap[day] ||
                 0
 
-              // cumulative progression
+              // cumulative rain progression
               const rainVal =
                 total *
                 ((hour + 1) /
@@ -428,7 +425,6 @@ export default function Page() {
       d => d.temperature
     )
 
-    // deduplicate cumulative rain
     const rainPerDay =
       new Map<
         string,
@@ -568,7 +564,6 @@ export default function Page() {
                       stats.max
                     }
                     {' '}
-                    ☔
                     {stats.rain.toFixed(
                       1
                     )}
@@ -592,14 +587,12 @@ export default function Page() {
             left: 0,
             bottom: 0
           }}
-          barCategoryGap="35%"
         >
           <CartesianGrid
             stroke="#cbd5e1"
             vertical={false}
           />
 
-          {/* midnight separators */}
           {midnightLines.map(
             t => (
               <ReferenceLine
@@ -610,7 +603,6 @@ export default function Page() {
             )
           )}
 
-          {/* freezing line */}
           <ReferenceLine
             y={0}
             stroke="#000"
@@ -687,20 +679,6 @@ export default function Page() {
             }
           />
 
-          {/* rain bars */}
-          <Bar
-            dataKey="rain"
-            fill="#38bdf8"
-            radius={[
-              3,
-              3,
-              0,
-              0
-            ]}
-            barSize={12}
-          />
-
-          {/* temp area */}
           <Area
             type="monotone"
             dataKey="temperature"
@@ -708,7 +686,6 @@ export default function Page() {
             stroke="none"
           />
 
-          {/* temp line */}
           <Line
             type="monotone"
             dataKey="temperature"

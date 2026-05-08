@@ -54,7 +54,9 @@ function aggregate15min(
     if (isNaN(d.getTime())) return
 
     d.setMinutes(
-      Math.floor(d.getMinutes() / 15) * 15,
+      Math.floor(
+        d.getMinutes() / 15
+      ) * 15,
       0,
       0
     )
@@ -70,7 +72,9 @@ function aggregate15min(
     )
   })
 
-  return Object.entries(buckets)
+  return Object.entries(
+    buckets
+  )
     .map(([time, temps]) => ({
       time,
       temperature:
@@ -374,7 +378,7 @@ export default function Page() {
                 rainMap[day] ||
                 0
 
-              // progressive cumulative rain
+              // cumulative progression
               const rainVal =
                 total *
                 ((hour + 1) /
@@ -588,6 +592,7 @@ export default function Page() {
             left: 0,
             bottom: 0
           }}
+          barCategoryGap="35%"
         >
           <CartesianGrid
             stroke="#cbd5e1"
@@ -614,9 +619,7 @@ export default function Page() {
             }
           />
 
-          {/* temperature axis */}
           <YAxis
-            yAxisId="temp"
             axisLine={false}
             tickLine={false}
             width={30}
@@ -626,23 +629,6 @@ export default function Page() {
             }}
             domain={[
               'auto',
-              'auto'
-            ]}
-          />
-
-          {/* rain axis */}
-          <YAxis
-            yAxisId="rain"
-            orientation="right"
-            axisLine={false}
-            tickLine={false}
-            width={28}
-            tick={{
-              fill: '#0284c7',
-              fontSize: 10
-            }}
-            domain={[
-              0,
               'auto'
             ]}
           />
@@ -699,12 +685,10 @@ export default function Page() {
             content={
               <CustomTooltip />
             }
-            shared={false}
           />
 
           {/* rain bars */}
           <Bar
-            yAxisId="rain"
             dataKey="rain"
             fill="#38bdf8"
             radius={[
@@ -713,16 +697,11 @@ export default function Page() {
               0,
               0
             ]}
-            barSize={
-              range === 7
-                ? 10
-                : 6
-            }
+            barSize={12}
           />
 
           {/* temp area */}
           <Area
-            yAxisId="temp"
             type="monotone"
             dataKey="temperature"
             fill="rgba(34,197,94,0.08)"
@@ -731,7 +710,6 @@ export default function Page() {
 
           {/* temp line */}
           <Line
-            yAxisId="temp"
             type="monotone"
             dataKey="temperature"
             stroke="#22c55e"

@@ -45,13 +45,20 @@ function aggregate15min(data: Row[]): ChartPoint[] {
 
   data.forEach(row => {
     const d = new Date(row.time)
+
     if (isNaN(d.getTime())) return
 
-    d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0)
+    d.setMinutes(
+      Math.floor(d.getMinutes() / 15) * 15,
+      0,
+      0
+    )
 
     const key = d.toISOString()
 
-    if (!buckets[key]) buckets[key] = []
+    if (!buckets[key]) {
+      buckets[key] = []
+    }
 
     buckets[key].push(row.temperature)
   })
@@ -60,7 +67,8 @@ function aggregate15min(data: Row[]): ChartPoint[] {
     .map(([time, temps]) => ({
       time,
       temperature:
-        temps.reduce((a, b) => a + b, 0) / temps.length,
+        temps.reduce((a, b) => a + b, 0) /
+        temps.length,
       rain: null
     }))
     .sort(
@@ -81,8 +89,10 @@ function smooth(data: ChartPoint[]): ChartPoint[] {
     )
 
     const avg =
-      slice.reduce((s, x) => s + x.temperature, 0) /
-      slice.length
+      slice.reduce(
+        (s, x) => s + x.temperature,
+        0
+      ) / slice.length
 
     return {
       ...p,
@@ -96,11 +106,14 @@ function generateTicks(data: ChartPoint[]) {
   if (!data.length) return []
 
   const start = new Date(data[0].time)
-  const end = new Date(data[data.length - 1].time)
+  const end = new Date(
+    data[data.length - 1].time
+  )
 
   const ticks: string[] = []
 
   const c = new Date(start)
+
   c.setMinutes(0, 0, 0)
 
   while (c <= end) {
@@ -111,45 +124,69 @@ function generateTicks(data: ChartPoint[]) {
   return ticks
 }
 
+// ---------- timezone-safe hour ----------
+function getHourInTZ(dateStr: string) {
+  return Number(
+    new Date(dateStr).toLocaleString(
+      'en-GB',
+      {
+        hour: '2-digit',
+        hour12: false,
+        timeZone: TZ
+      }
+    )
+  )
+}
+
 // ---------- tooltip ----------
 const CustomTooltip = ({
   active,
   payload,
   label
 }: any) => {
-  if (!active || !payload?.length) return null
+  if (!active || !payload?.length) {
+    return null
+  }
 
   const d = new Date(label)
 
-  const time = d.toLocaleTimeString('sk-SK', {
-    timeZone: TZ,
-    hour: '2-digit',
-    minute: '2-digit',
-  })
+  const time = d.toLocaleTimeString(
+    'sk-SK',
+    {
+      timeZone: TZ,
+      hour: '2-digit',
+      minute: '2-digit',
+    }
+  )
 
   const temp =
     payload.find(
-      (p: any) => p.dataKey === 'temperature'
+      (p: any) =>
+        p.dataKey === 'temperature'
     )?.value
 
   const rain =
     payload.find(
-      (p: any) => p.dataKey === 'rain'
-    )?.value ?? 0
+      (p: any) =>
+        p.dataKey === 'rain'
+    )?.value
 
   return (
     <div
       style={{
         background: '#fff',
         border: '1px solid #e2e8f0',
-        borderRadius: 6,
-        padding: '6px 8px'
+        borderRadius: 8,
+        padding: '8px 10px',
+        boxShadow:
+          '0 2px 8px rgba(0,0,0,0.08)'
       }}
     >
       <div
         style={{
           fontSize: 10,
-          color: '#64748b'
+          color: '#64748b',
+          marginBottom: 4
         }}
       >
         {time}
@@ -162,24 +199,30 @@ const CustomTooltip = ({
           color: '#22c55e'
         }}
       >
-        {temp}°C
+        🌡 {temp}°C
       </div>
 
-      <div
-        style={{
-          fontSize: 12,
-          color: '#0ea5e9'
-        }}
-      >
-        {rain.toFixed(2)} mm
-      </div>
+      {typeof rain === 'number' && (
+        <div
+          style={{
+            fontSize: 12,
+            color: '#0ea5e9',
+            marginTop: 2
+          }}
+        >
+          ☔ {rain.toFixed(1)} mm
+        </div>
+      )}
     </div>
   )
 }
 
 // ---------- MAIN ----------
 export default function Page() {
-  const [data, setData] = useState<ChartPoint[]>([])
+  const [data, setData] = useState<
+    ChartPoint[]
+  >([])
+
   const [range, setRange] = useState(7)
 
   useEffect(() => {
@@ -190,23 +233,43 @@ export default function Page() {
         Date.now() - range * 86400000
       )
 
-      const sinceISO = sinceDate.toISOString()
-      const sinceDay = sinceISO.slice(0, 10)
+      const sinceISO =
+        sinceDate.toISOString()
+
+      const sinceDay =
+        sinceISO.slice(0, 10)
 
       // ---------- temperatures ----------
-      const { data: tempRaw } = await supabase
-        .from('netatmo_measurements')
-        .select('time, temperature, module_name')
-        .gte('time', sinceISO)
-        .eq('module_name', 'Outdoor')
-        .not('temperature', 'is', null)
-        .order('time', { ascending: true })
+      const { data: tempRaw } =
+        await supabase
+          .from(
+            'netatmo_measurements'
+          )
+          .select(
+            'time, temperature, module_name'
+          )
+          .gte('time', sinceISO)
+          .eq(
+            'module_name',
+            'Outdoor'
+          )
+          .not(
+            'temperature',
+            'is',
+            null
+          )
+          .order('time', {
+            ascending: true
+          })
 
       // ---------- rain ----------
-      const { data: rainRaw } = await supabase
-        .from('netatmo_daily_stats')
-        .select('day, rain_sum')
-        .gte('day', sinceDay)
+      const { data: rainRaw } =
+        await supabase
+          .from(
+            'netatmo_daily_stats'
+          )
+          .select('day, rain_sum')
+          .gte('day', sinceDay)
 
       if (!mounted) return
 
@@ -214,74 +277,72 @@ export default function Page() {
         aggregate15min(tempRaw ?? [])
       )
 
-      const rainMap: Record<string, number> = {}
+      const rainMap: Record<
+        string,
+        number
+      > = {}
 
-      ;(rainRaw as RainRow[] || []).forEach(r => {
+      ;(
+        (rainRaw as RainRow[]) || []
+      ).forEach(r => {
         rainMap[r.day] =
-          typeof r.rain_sum === 'number'
+          typeof r.rain_sum ===
+          'number'
             ? r.rain_sum
             : 0
       })
 
-      const merged = tempData.map(p => {
-        const d = p.time.slice(0, 10)
+      const merged = tempData.map(
+        p => {
+          const day =
+            p.time.slice(0, 10)
 
-        const dObj = new Date(p.time)
+          const hour =
+            getHourInTZ(p.time)
 
-        const hour = Number(
-          dObj.toLocaleString('en-GB', {
-            hour: '2-digit',
-            hour12: false,
-            timeZone: TZ
-          })
-        )
+          const total =
+            rainMap[day] || 0
 
-        const total = rainMap[d] || 0
+          // hide tiny rain noise
+          if (total < 0.4) {
+            return {
+              ...p,
+              rain: null
+            }
+          }
 
-        // ---------- 7d ----------
-        if (range === 7) {
-          if (hour === 12) {
+          // ---------- 7d ----------
+          if (range === 7) {
             return {
               ...p,
               rain:
-                total > 0.4
+                hour === 12
                   ? total
                   : null
             }
           }
 
-          return {
-            ...p,
-            rain: null
-          }
-        }
-
-        // ---------- 14d / 30d ----------
-        if (hour === 23) {
+          // ---------- 14d / 30d ----------
           return {
             ...p,
             rain:
-              total > 0.4
+              hour === 23
                 ? total
                 : null
           }
         }
-
-        return {
-          ...p,
-          rain: null
-        }
-      })
+      )
 
       setData(merged)
     }
 
     fetchAll()
 
-    const interval = setInterval(
-      fetchAll,
-      4 * 60 * 1000
-    )
+    const interval =
+      setInterval(
+        fetchAll,
+        4 * 60 * 1000
+      )
 
     return () => {
       mounted = false
@@ -291,18 +352,53 @@ export default function Page() {
 
   // ---------- stats ----------
   const stats = useMemo(() => {
-    if (!data.length) return null
+    if (!data.length) {
+      return null
+    }
 
-    const temps = data.map(d => d.temperature)
-
-    const rainTotal = data.reduce(
-      (s, d) => s + (d.rain || 0),
-      0
+    const temps = data.map(
+      d => d.temperature
     )
 
+    // unique rain/day only
+    const rainPerDay =
+      new Map<string, number>()
+
+    data.forEach(d => {
+      if (
+        typeof d.rain === 'number'
+      ) {
+        const day =
+          d.time.slice(0, 10)
+
+        if (
+          !rainPerDay.has(day)
+        ) {
+          rainPerDay.set(
+            day,
+            d.rain
+          )
+        }
+      }
+    })
+
+    const rainTotal =
+      Array.from(
+        rainPerDay.values()
+      ).reduce(
+        (a, b) => a + b,
+        0
+      )
+
     return {
-      min: Math.min(...temps).toFixed(1),
-      max: Math.max(...temps).toFixed(1),
+      min: Math.min(
+        ...temps
+      ).toFixed(1),
+
+      max: Math.max(
+        ...temps
+      ).toFixed(1),
+
       rain: rainTotal
     }
   }, [data])
@@ -312,19 +408,10 @@ export default function Page() {
     [data]
   )
 
-  const midnightLines = ticks.filter(t => {
-    const d = new Date(t)
-
-    return (
-      Number(
-        d.toLocaleString('en-GB', {
-          hour: '2-digit',
-          hour12: false,
-          timeZone: TZ
-        })
-      ) === 0
+  const midnightLines =
+    ticks.filter(
+      t => getHourInTZ(t) === 0
     )
-  })
 
   return (
     <div
@@ -349,12 +436,15 @@ export default function Page() {
         {[7, 14, 30].map(r => (
           <button
             key={r}
-            onClick={() => setRange(r)}
+            onClick={() =>
+              setRange(r)
+            }
             style={{
               flex: 1,
               padding: '6px 0',
               borderRadius: 8,
-              border: '1px solid #e2e8f0',
+              border:
+                '1px solid #e2e8f0',
               background:
                 range === r
                   ? '#22c55e'
@@ -363,20 +453,30 @@ export default function Page() {
                 range === r
                   ? '#fff'
                   : '#64748b',
-              fontSize: 12
+              fontSize: 12,
+              cursor: 'pointer'
             }}
           >
             <div>{r}d</div>
 
-            {stats && range === r && (
-              <div style={{ fontSize: 10 }}>
-                ↓{stats.min}
-                {' '}
-                ↑{stats.max}
-                {' '}
-                ☔{stats.rain.toFixed(1)}mm
-              </div>
-            )}
+            {stats &&
+              range === r && (
+                <div
+                  style={{
+                    fontSize: 10
+                  }}
+                >
+                  ↓{stats.min}
+                  {' '}
+                  ↑{stats.max}
+                  {' '}
+                  ☔
+                  {stats.rain.toFixed(
+                    1
+                  )}
+                  mm
+                </div>
+              )}
           </button>
         ))}
       </div>
@@ -387,21 +487,30 @@ export default function Page() {
       >
         <LineChart
           data={data}
-          margin={{ top: 16 }}
+          margin={{
+            top: 16,
+            right: 8,
+            left: 0,
+            bottom: 0
+          }}
         >
           <CartesianGrid
             stroke="#cbd5e1"
             vertical={false}
           />
 
-          {midnightLines.map(t => (
-            <ReferenceLine
-              key={t}
-              x={t}
-              stroke="#cbd5e1"
-            />
-          ))}
+          {/* midnight separators */}
+          {midnightLines.map(
+            t => (
+              <ReferenceLine
+                key={t}
+                x={t}
+                stroke="#cbd5e1"
+              />
+            )
+          )}
 
+          {/* freezing line */}
           <ReferenceLine
             y={0}
             stroke="#000"
@@ -414,26 +523,28 @@ export default function Page() {
             interval={0}
             axisLine={false}
             tickLine={false}
-            tick={({ x, y, payload }) => {
-              const d = new Date(payload.value)
-
-              const hour = Number(
-                d.toLocaleString('en-GB', {
-                  hour: '2-digit',
-                  hour12: false,
-                  timeZone: TZ
-                })
-              )
+            tick={({
+              x,
+              y,
+              payload
+            }) => {
+              const d =
+                new Date(
+                  payload.value
+                )
 
               if (
-                isNaN(d.getTime()) ||
-                hour !== 0
+                getHourInTZ(
+                  payload.value
+                ) !== 0
               ) {
                 return null
               }
 
               return (
-                <g transform={`translate(${x},${y})`}>
+                <g
+                  transform={`translate(${x},${y})`}
+                >
                   <text
                     y={-12}
                     textAnchor="middle"
@@ -444,7 +555,8 @@ export default function Page() {
                       'sk-SK',
                       {
                         day: '2-digit',
-                        month: '2-digit'
+                        month:
+                          '2-digit'
                       }
                     )}
                   </text>
@@ -461,56 +573,78 @@ export default function Page() {
               fill: '#000',
               fontSize: 11
             }}
-            domain={([min, max]) => {
+            domain={([
+              min,
+              max
+            ]) => {
               const buffer = 2
 
               if (min >= 0) {
                 return [
                   0,
-                  Math.ceil(max + buffer)
+                  Math.ceil(
+                    max + buffer
+                  )
                 ]
               }
 
               if (max <= 0) {
                 return [
-                  Math.floor(min - buffer),
+                  Math.floor(
+                    min - buffer
+                  ),
                   0
                 ]
               }
 
               return [
-                Math.floor(min - buffer),
-                Math.ceil(max + buffer)
+                Math.floor(
+                  min - buffer
+                ),
+                Math.ceil(
+                  max + buffer
+                )
               ]
             }}
           />
 
           <Tooltip
-            content={<CustomTooltip />}
+            content={
+              <CustomTooltip />
+            }
+            shared={false}
           />
 
+          {/* rain bars */}
           <Bar
             dataKey="rain"
             fill="#38bdf8"
+            radius={[3, 3, 0, 0]}
             barSize={
               range === 7
-                ? 10
-                : 6
+                ? 14
+                : 10
             }
           />
 
+          {/* temp area */}
           <Area
             type="monotone"
             dataKey="temperature"
             fill="rgba(34,197,94,0.08)"
+            stroke={false}
           />
 
+          {/* temp line */}
           <Line
             type="monotone"
             dataKey="temperature"
             stroke="#22c55e"
             strokeWidth={2}
             dot={false}
+            activeDot={{
+              r: 4
+            }}
           />
         </LineChart>
       </ResponsiveContainer>

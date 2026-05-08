@@ -161,17 +161,19 @@ export default function Page() {
         const hour = new Date(p.time).getHours()
         const total = rainMap[d] || 0
 
-        if (range === 7) {
-          const rainVal = total * (hour / 24)
-          return { ...p, rain: rainVal > 0.4 ? rainVal : null }
-        }
-
-        if (hour === 23) {
+      if (range === 7) {
+        if (hour === 12) {
           return { ...p, rain: total > 0.4 ? total : null }
         }
 
         return { ...p, rain: null }
-      })
+      }
+
+      if (hour === 23) {
+        return { ...p, rain: total > 0.4 ? total : null }
+      }
+
+      return { ...p, rain: null }
 
       setData(merged)
     }

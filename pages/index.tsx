@@ -564,6 +564,7 @@ export default function Page() {
                       stats.max
                     }
                     {' '}
+                    ☔
                     {stats.rain.toFixed(
                       1
                     )}

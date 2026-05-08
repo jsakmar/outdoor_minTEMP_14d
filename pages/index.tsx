@@ -161,22 +161,34 @@ export default function Page() {
         const hour = new Date(p.time).getHours()
         const total = rainMap[d] || 0
 
-      if (range === 7) {
-        if (hour === 12) {
-          return { ...p, rain: total > 0.4 ? total : null }
+        // 7d chart
+        if (range === 7) {
+          if (hour === 12) {
+            return {
+              ...p,
+              rain: total > 0.4 ? total : null
+            }
+          }
+
+          return {
+            ...p,
+            rain: null
+          }
         }
 
-        return { ...p, rain: null }
-      }
+        // 14d / 30d chart
+        if (hour === 23) {
+          return {
+            ...p,
+            rain: total > 0.4 ? total : null
+          }
+        }
 
-      if (hour === 23) {
-        return { ...p, rain: total > 0.4 ? total : null }
-      }
-
-      return { ...p, rain: null }
-
-      setData(merged)
-    }
+        return {
+          ...p,
+          rain: null
+        }
+      })
 
     fetchAll()
     const interval = setInterval(fetchAll, 4 * 60 * 1000)

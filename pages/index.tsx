@@ -40,8 +40,13 @@ type ChartPoint = {
 const TZ = 'Europe/Bratislava'
 
 // ---------- aggregation ----------
-function aggregate15min(data: Row[]): ChartPoint[] {
-  const buckets: Record<string, number[]> = {}
+function aggregate15min(
+  data: Row[]
+): ChartPoint[] {
+  const buckets: Record<
+    string,
+    number[]
+  > = {}
 
   data.forEach(row => {
     const d = new Date(row.time)
@@ -60,52 +65,73 @@ function aggregate15min(data: Row[]): ChartPoint[] {
       buckets[key] = []
     }
 
-    buckets[key].push(row.temperature)
+    buckets[key].push(
+      row.temperature
+    )
   })
 
   return Object.entries(buckets)
     .map(([time, temps]) => ({
       time,
       temperature:
-        temps.reduce((a, b) => a + b, 0) /
-        temps.length,
+        temps.reduce(
+          (a, b) => a + b,
+          0
+        ) / temps.length,
       rain: null
     }))
     .sort(
       (a, b) =>
-        new Date(a.time).getTime() -
-        new Date(b.time).getTime()
+        new Date(
+          a.time
+        ).getTime() -
+        new Date(
+          b.time
+        ).getTime()
     )
 }
 
 // ---------- smoothing ----------
-function smooth(data: ChartPoint[]): ChartPoint[] {
+function smooth(
+  data: ChartPoint[]
+): ChartPoint[] {
   const w = 3
 
   return data.map((p, i) => {
     const slice = data.slice(
       Math.max(0, i - w),
-      Math.min(data.length, i + w + 1)
+      Math.min(
+        data.length,
+        i + w + 1
+      )
     )
 
     const avg =
       slice.reduce(
-        (s, x) => s + x.temperature,
+        (s, x) =>
+          s + x.temperature,
         0
       ) / slice.length
 
     return {
       ...p,
-      temperature: Number(avg.toFixed(1))
+      temperature: Number(
+        avg.toFixed(1)
+      )
     }
   })
 }
 
 // ---------- ticks ----------
-function generateTicks(data: ChartPoint[]) {
+function generateTicks(
+  data: ChartPoint[]
+) {
   if (!data.length) return []
 
-  const start = new Date(data[0].time)
+  const start = new Date(
+    data[0].time
+  )
+
   const end = new Date(
     data[data.length - 1].time
   )
@@ -117,17 +143,26 @@ function generateTicks(data: ChartPoint[]) {
   c.setMinutes(0, 0, 0)
 
   while (c <= end) {
-    ticks.push(c.toISOString())
-    c.setHours(c.getHours() + 1)
+    ticks.push(
+      c.toISOString()
+    )
+
+    c.setHours(
+      c.getHours() + 1
+    )
   }
 
   return ticks
 }
 
 // ---------- timezone-safe hour ----------
-function getHourInTZ(dateStr: string) {
+function getHourInTZ(
+  dateStr: string
+) {
   return Number(
-    new Date(dateStr).toLocaleString(
+    new Date(
+      dateStr
+    ).toLocaleString(
       'en-GB',
       {
         hour: '2-digit',
@@ -144,25 +179,30 @@ const CustomTooltip = ({
   payload,
   label
 }: any) => {
-  if (!active || !payload?.length) {
+  if (
+    !active ||
+    !payload?.length
+  ) {
     return null
   }
 
   const d = new Date(label)
 
-  const time = d.toLocaleTimeString(
-    'sk-SK',
-    {
-      timeZone: TZ,
-      hour: '2-digit',
-      minute: '2-digit',
-    }
-  )
+  const time =
+    d.toLocaleTimeString(
+      'sk-SK',
+      {
+        timeZone: TZ,
+        hour: '2-digit',
+        minute: '2-digit',
+      }
+    )
 
   const temp =
     payload.find(
       (p: any) =>
-        p.dataKey === 'temperature'
+        p.dataKey ===
+        'temperature'
     )?.value
 
   const rain =
@@ -175,7 +215,8 @@ const CustomTooltip = ({
     <div
       style={{
         background: '#fff',
-        border: '1px solid #e2e8f0',
+        border:
+          '1px solid #e2e8f0',
         borderRadius: 6,
         padding: '6px 8px'
       }}
@@ -199,7 +240,8 @@ const CustomTooltip = ({
         {temp}°C
       </div>
 
-      {typeof rain === 'number' && (
+      {typeof rain ===
+        'number' && (
         <div
           style={{
             fontSize: 12,
@@ -215,36 +257,49 @@ const CustomTooltip = ({
 
 // ---------- MAIN ----------
 export default function Page() {
-  const [data, setData] = useState<
-    ChartPoint[]
-  >([])
+  const [data, setData] =
+    useState<
+      ChartPoint[]
+    >([])
 
-  const [range, setRange] = useState(7)
+  const [range, setRange] =
+    useState(7)
 
   useEffect(() => {
     let mounted = true
 
-    const fetchAll = async () => {
-      const sinceDate = new Date(
-        Date.now() - range * 86400000
-      )
+    const fetchAll =
+      async () => {
+        const sinceDate =
+          new Date(
+            Date.now() -
+              range *
+                86400000
+          )
 
-      const sinceISO =
-        sinceDate.toISOString()
+        const sinceISO =
+          sinceDate.toISOString()
 
-      const sinceDay =
-        sinceISO.slice(0, 10)
+        const sinceDay =
+          sinceISO.slice(
+            0,
+            10
+          )
 
-      // ---------- temperatures ----------
-      const { data: tempRaw } =
-        await supabase
+        // ---------- temperatures ----------
+        const {
+          data: tempRaw
+        } = await supabase
           .from(
             'netatmo_measurements'
           )
           .select(
             'time, temperature, module_name'
           )
-          .gte('time', sinceISO)
+          .gte(
+            'time',
+            sinceISO
+          )
           .eq(
             'module_name',
             'Outdoor'
@@ -254,70 +309,94 @@ export default function Page() {
             'is',
             null
           )
-          .order('time', {
-            ascending: true
-          })
+          .order(
+            'time',
+            {
+              ascending: true
+            }
+          )
 
-      // ---------- rain ----------
-      const { data: rainRaw } =
-        await supabase
+        // ---------- rain ----------
+        const {
+          data: rainRaw
+        } = await supabase
           .from(
             'netatmo_daily_stats'
           )
-          .select('day, rain_sum')
-          .gte('day', sinceDay)
+          .select(
+            'day, rain_sum'
+          )
+          .gte(
+            'day',
+            sinceDay
+          )
 
-      if (!mounted) return
+        if (!mounted) return
 
-      const tempData = smooth(
-        aggregate15min(tempRaw ?? [])
-      )
+        const tempData =
+          smooth(
+            aggregate15min(
+              tempRaw ?? []
+            )
+          )
 
-      const rainMap: Record<
-        string,
-        number
-      > = {}
+        const rainMap: Record<
+          string,
+          number
+        > = {}
 
-      ;(
-        (rainRaw as RainRow[]) || []
-      ).forEach(r => {
-        rainMap[r.day] =
-          typeof r.rain_sum ===
-          'number'
-            ? r.rain_sum
-            : 0
-      })
+        ;(
+          (rainRaw as RainRow[]) ||
+          []
+        ).forEach(r => {
+          rainMap[r.day] =
+            typeof r.rain_sum ===
+            'number'
+              ? r.rain_sum
+              : 0
+        })
 
-      const merged = tempData.map(
-        p => {
-          const day =
-            p.time.slice(0, 10)
+        const merged =
+          tempData.map(
+            p => {
+              const day =
+                p.time.slice(
+                  0,
+                  10
+                )
 
-          const hour =
-            getHourInTZ(p.time)
+              const hour =
+                getHourInTZ(
+                  p.time
+                )
 
-          const total =
-            rainMap[day] || 0
+              const total =
+                rainMap[day] ||
+                0
 
-          // progressive cumulative rain
-          const rainVal =
-            total *
-            ((hour + 1) / 24)
+              // progressive cumulative rain
+              const rainVal =
+                total *
+                ((hour + 1) /
+                  24)
 
-          return {
-            ...p,
-            rain:
-              rainVal > 0.2
-                ? Number(
-                    rainVal.toFixed(2)
-                  )
-                : null
-          }
-        }
-      )
+              return {
+                ...p,
+                rain:
+                  rainVal >
+                  0.2
+                    ? Number(
+                        rainVal.toFixed(
+                          2
+                        )
+                      )
+                    : null
+              }
+            }
+          )
 
-      setData(merged)
-    }
+        setData(merged)
+      }
 
     fetchAll()
 
@@ -329,7 +408,9 @@ export default function Page() {
 
     return () => {
       mounted = false
-      clearInterval(interval)
+      clearInterval(
+        interval
+      )
     }
   }, [range])
 
@@ -345,20 +426,31 @@ export default function Page() {
 
     // deduplicate cumulative rain
     const rainPerDay =
-      new Map<string, number>()
+      new Map<
+        string,
+        number
+      >()
 
     data.forEach(d => {
       if (
-        typeof d.rain === 'number'
+        typeof d.rain ===
+        'number'
       ) {
         const day =
-          d.time.slice(0, 10)
+          d.time.slice(
+            0,
+            10
+          )
 
         const current =
-          rainPerDay.get(day) || 0
+          rainPerDay.get(
+            day
+          ) || 0
 
-        // keep max daily value
-        if (d.rain > current) {
+        if (
+          d.rain >
+          current
+        ) {
           rainPerDay.set(
             day,
             d.rain
@@ -389,13 +481,16 @@ export default function Page() {
   }, [data])
 
   const ticks = useMemo(
-    () => generateTicks(data),
+    () =>
+      generateTicks(data),
     [data]
   )
 
   const midnightLines =
     ticks.filter(
-      t => getHourInTZ(t) === 0
+      t =>
+        getHourInTZ(t) ===
+        0
     )
 
   return (
@@ -406,7 +501,8 @@ export default function Page() {
         margin: '0 auto',
         height: 280,
         paddingTop: 6,
-        boxSizing: 'border-box'
+        boxSizing:
+          'border-box'
       }}
     >
       {/* buttons */}
@@ -415,55 +511,69 @@ export default function Page() {
           display: 'flex',
           gap: 6,
           marginBottom: 4,
-          padding: '0 6px'
+          padding:
+            '0 6px'
         }}
       >
-        {[7, 14, 30].map(r => (
-          <button
-            key={r}
-            onClick={() =>
-              setRange(r)
-            }
-            style={{
-              flex: 1,
-              padding: '6px 0',
-              borderRadius: 8,
-              border:
-                '1px solid #e2e8f0',
-              background:
-                range === r
-                  ? '#22c55e'
-                  : '#fff',
-              color:
-                range === r
-                  ? '#fff'
-                  : '#64748b',
-              fontSize: 12,
-              cursor: 'pointer'
-            }}
-          >
-            <div>{r}d</div>
+        {[7, 14, 30].map(
+          r => (
+            <button
+              key={r}
+              onClick={() =>
+                setRange(r)
+              }
+              style={{
+                flex: 1,
+                padding:
+                  '6px 0',
+                borderRadius: 8,
+                border:
+                  '1px solid #e2e8f0',
+                background:
+                  range === r
+                    ? '#22c55e'
+                    : '#fff',
+                color:
+                  range === r
+                    ? '#fff'
+                    : '#64748b',
+                fontSize: 12,
+                cursor:
+                  'pointer'
+              }}
+            >
+              <div>
+                {r}d
+              </div>
 
-            {stats &&
-              range === r && (
-                <div
-                  style={{
-                    fontSize: 10
-                  }}
-                >
-                  ↓{stats.min}
-                  {' '}
-                  ↑{stats.max}
-                  {' '}
-                  ☔
-                  {stats.rain.toFixed(
-                    1
-                  )}
-                  mm
-                </div>
-              )}
-          </button>
-        ))}
+              {stats &&
+                range ===
+                  r && (
+                  <div
+                    style={{
+                      fontSize: 10
+                    }}
+                  >
+                    ↓
+                    {
+                      stats.min
+                    }
+                    {' '}
+                    ↑
+                    {
+                      stats.max
+                    }
+                    {' '}
+                    ☔
+                    {stats.rain.toFixed(
+                      1
+                    )}
+                    mm
+                  </div>
+                )}
+            </button>
+          )
+        )}
       </div>
 
       <ResponsiveContainer
@@ -499,7 +609,9 @@ export default function Page() {
           <ReferenceLine
             y={0}
             stroke="#000"
-            strokeWidth={1.5}
+            strokeWidth={
+              1.5
+            }
           />
 
           {/* temperature axis */}
@@ -512,36 +624,10 @@ export default function Page() {
               fill: '#000',
               fontSize: 11
             }}
-            domain={([min, max]) => {
-              const buffer = 2
-
-              if (min >= 0) {
-                return [
-                  0,
-                  Math.ceil(
-                    max + buffer
-                  )
-                ]
-              }
-
-              if (max <= 0) {
-                return [
-                  Math.floor(
-                    min - buffer
-                  ),
-                  0
-                ]
-              }
-
-              return [
-                Math.floor(
-                  min - buffer
-                ),
-                Math.ceil(
-                  max + buffer
-                )
-              ]
-            }}
+            domain={[
+              'auto',
+              'auto'
+            ]}
           />
 
           {/* rain axis */}
@@ -555,7 +641,10 @@ export default function Page() {
               fill: '#0284c7',
               fontSize: 10
             }}
-            domain={[0, 'auto']}
+            domain={[
+              0,
+              'auto'
+            ]}
           />
 
           <XAxis
@@ -618,7 +707,12 @@ export default function Page() {
             yAxisId="rain"
             dataKey="rain"
             fill="#38bdf8"
-            radius={[3, 3, 0, 0]}
+            radius={[
+              3,
+              3,
+              0,
+              0
+            ]}
             barSize={
               range === 7
                 ? 10
@@ -643,7 +737,9 @@ export default function Page() {
             stroke="#22c55e"
             strokeWidth={2}
             dot={false}
-            activeDot={{ r: 4 }}
+            activeDot={{
+              r: 4
+            }}
           />
         </LineChart>
       </ResponsiveContainer>

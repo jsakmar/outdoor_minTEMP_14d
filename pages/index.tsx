@@ -502,6 +502,62 @@ export default function Page() {
             strokeWidth={1.5}
           />
 
+          {/* temperature axis */}
+          <YAxis
+            yAxisId="temp"
+            axisLine={false}
+            tickLine={false}
+            width={30}
+            tick={{
+              fill: '#000',
+              fontSize: 11
+            }}
+            domain={([min, max]) => {
+              const buffer = 2
+
+              if (min >= 0) {
+                return [
+                  0,
+                  Math.ceil(
+                    max + buffer
+                  )
+                ]
+              }
+
+              if (max <= 0) {
+                return [
+                  Math.floor(
+                    min - buffer
+                  ),
+                  0
+                ]
+              }
+
+              return [
+                Math.floor(
+                  min - buffer
+                ),
+                Math.ceil(
+                  max + buffer
+                )
+              ]
+            }}
+          />
+
+          {/* rain axis */}
+          <YAxis
+            yAxisId="rain"
+            orientation="right"
+            axisLine={false}
+            tickLine={false}
+            width={28}
+            tick={{
+              fill: '#0284c7',
+              fontSize: 10
+            }}
+            domain={[0, 'auto']}
+          />
+
           <XAxis
             dataKey="time"
             ticks={ticks}
@@ -550,49 +606,6 @@ export default function Page() {
             }}
           />
 
-          <YAxis
-            axisLine={false}
-            tickLine={false}
-            width={30}
-            tick={{
-              fill: '#000',
-              fontSize: 11
-            }}
-            domain={([
-              min,
-              max
-            ]) => {
-              const buffer = 2
-
-              if (min >= 0) {
-                return [
-                  0,
-                  Math.ceil(
-                    max + buffer
-                  )
-                ]
-              }
-
-              if (max <= 0) {
-                return [
-                  Math.floor(
-                    min - buffer
-                  ),
-                  0
-                ]
-              }
-
-              return [
-                Math.floor(
-                  min - buffer
-                ),
-                Math.ceil(
-                  max + buffer
-                )
-              ]
-            }}
-          />
-
           <Tooltip
             content={
               <CustomTooltip />
@@ -602,6 +615,7 @@ export default function Page() {
 
           {/* rain bars */}
           <Bar
+            yAxisId="rain"
             dataKey="rain"
             fill="#38bdf8"
             radius={[3, 3, 0, 0]}
@@ -614,6 +628,7 @@ export default function Page() {
 
           {/* temp area */}
           <Area
+            yAxisId="temp"
             type="monotone"
             dataKey="temperature"
             fill="rgba(34,197,94,0.08)"
@@ -622,6 +637,7 @@ export default function Page() {
 
           {/* temp line */}
           <Line
+            yAxisId="temp"
             type="monotone"
             dataKey="temperature"
             stroke="#22c55e"

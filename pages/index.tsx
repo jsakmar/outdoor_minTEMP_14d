@@ -632,7 +632,7 @@ export default function Page() {
             type="monotone"
             dataKey="temperature"
             fill="rgba(34,197,94,0.08)"
-            stroke={false}
+            stroke="none"
           />
 
           {/* temp line */}
@@ -642,9 +642,7 @@ export default function Page() {
             stroke="#22c55e"
             strokeWidth={2}
             dot={false}
-            activeDot={{
-              r: 4
-            }}
+            activeDot={{ r: 4 }}
           />
         </LineChart>
       </ResponsiveContainer>

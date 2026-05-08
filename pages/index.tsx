@@ -299,31 +299,18 @@ export default function Page() {
           const total =
             rainMap[day] || 0
 
-          // hide tiny rain noise
-          if (total < 0.4) {
-            return {
-              ...p,
-              rain: null
-            }
-          }
+          // progressive cumulative rain
+          const rainVal =
+            total *
+            ((hour + 1) / 24)
 
-          // ---------- 7d ----------
-          if (range === 7) {
-            return {
-              ...p,
-              rain:
-                hour === 12
-                  ? total
-                  : null
-            }
-          }
-
-          // ---------- 14d / 30d ----------
           return {
             ...p,
             rain:
-              hour === 23
-                ? total
+              rainVal > 0.2
+                ? Number(
+                    rainVal.toFixed(2)
+                  )
                 : null
           }
         }
@@ -356,7 +343,7 @@ export default function Page() {
       d => d.temperature
     )
 
-    // unique rain/day only
+    // deduplicate cumulative rain
     const rainPerDay =
       new Map<string, number>()
 
@@ -367,9 +354,11 @@ export default function Page() {
         const day =
           d.time.slice(0, 10)
 
-        if (
-          !rainPerDay.has(day)
-        ) {
+        const current =
+          rainPerDay.get(day) || 0
+
+        // keep max daily value
+        if (d.rain > current) {
           rainPerDay.set(
             day,
             d.rain
@@ -618,8 +607,8 @@ export default function Page() {
             radius={[3, 3, 0, 0]}
             barSize={
               range === 7
-                ? 14
-                : 10
+                ? 10
+                : 6
             }
           />
 

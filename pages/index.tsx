@@ -176,17 +176,14 @@ const CustomTooltip = ({
       style={{
         background: '#fff',
         border: '1px solid #e2e8f0',
-        borderRadius: 8,
-        padding: '8px 10px',
-        boxShadow:
-          '0 2px 8px rgba(0,0,0,0.08)'
+        borderRadius: 6,
+        padding: '6px 8px'
       }}
     >
       <div
         style={{
           fontSize: 10,
-          color: '#64748b',
-          marginBottom: 4
+          color: '#64748b'
         }}
       >
         {time}
@@ -199,18 +196,17 @@ const CustomTooltip = ({
           color: '#22c55e'
         }}
       >
-        🌡 {temp}°C
+        {temp}°C
       </div>
 
       {typeof rain === 'number' && (
         <div
           style={{
             fontSize: 12,
-            color: '#0ea5e9',
-            marginTop: 2
+            color: '#0ea5e9'
           }}
         >
-          ☔ {rain.toFixed(1)} mm
+          {rain.toFixed(1)} mm
         </div>
       )}
     </div>

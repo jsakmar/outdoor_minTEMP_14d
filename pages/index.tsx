@@ -132,9 +132,9 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-export default function Page() {
+export default function Home() {
   const [data, setData] = useState<ChartPoint[]>([])
-  const [range, setRange] = useState(7)
+  const [range, setRange] = useState(14) // Matching your 14d project baseline
   const [loading, setLoading] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -284,3 +284,13 @@ export default function Page() {
                 stroke="#22c55e"
                 strokeWidth={2}
                 dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+
+      </div>
+    </main>
+  )
+}

@@ -161,18 +161,36 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [range])
 
+  // Precision active measurement hook + layout shift recovery
   useEffect(() => {
     if (loading || !containerRef.current) return
 
-    const resizeObserver = new ResizeObserver((entries) => {
-      for (let entry of entries) {
-        const height = Math.ceil(entry.contentRect.height)
-        window.parent.postMessage({ type: 'resize', height: height + 4 }, '*')
+    const dispatchHeight = () => {
+      if (containerRef.current) {
+        const height = Math.ceil(containerRef.current.getBoundingClientRect().height)
+        window.parent.postMessage({ type: 'resize', height: height + 6 }, '*')
       }
-    })
+    }
 
+    const resizeObserver = new ResizeObserver(() => {
+      dispatchHeight()
+    })
     resizeObserver.observe(containerRef.current)
-    return () => resizeObserver.disconnect()
+
+    // Triggers layout measurement checks when device switches to landscape or portrait mode
+    const handleOrientationChange = () => {
+      setTimeout(dispatchHeight, 200)
+      setTimeout(dispatchHeight, 500) // Double fallback ensures charts settle securely
+    }
+
+    window.addEventListener('resize', handleOrientationChange)
+    window.addEventListener('orientationchange', handleOrientationChange)
+
+    return () => {
+      resizeObserver.disconnect()
+      window.removeEventListener('resize', handleOrientationChange)
+      window.removeEventListener('orientationchange', handleOrientationChange)
+    }
   }, [loading, data])
 
   const stats = useMemo(() => {
@@ -230,10 +248,10 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Chart Canvas Box - Added bottom margins and padding safeguards to prevent X-Axis cutoff */}
+        {/* Chart Canvas Box */}
         <div style={{ height: 230, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 15 }}>
+            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 12 }}>
               <CartesianGrid stroke="#e2e8f0" vertical={false} />
               
               {midnightLines.map(t => (
@@ -256,7 +274,6 @@ export default function Home() {
                 interval={0}
                 axisLine={false}
                 tickLine={false}
-                padding={{ bottom: 10 }}
                 tick={({ x, y, payload }) => {
                   if (getHourInTZ(payload.value) !== 0) return null
                   const d = new Date(payload.value)

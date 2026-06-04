@@ -56,6 +56,7 @@ function aggregate15min(data: Row[]): ChartPoint[] {
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
 }
 
+// ---------- smoothing ----------
 function smooth(data: ChartPoint[]): ChartPoint[] {
   const w = 3
 
@@ -74,6 +75,7 @@ function smooth(data: ChartPoint[]): ChartPoint[] {
   })
 }
 
+// ---------- ticks ----------
 function generateTicks(data: ChartPoint[]) {
   if (!data.length) return []
 
@@ -161,14 +163,14 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [range])
 
-  // Precision active measurement hook + layout shift recovery
+  // Height observer loop with extra whitespace buffers removed
   useEffect(() => {
     if (loading || !containerRef.current) return
 
     const dispatchHeight = () => {
       if (containerRef.current) {
         const height = Math.ceil(containerRef.current.getBoundingClientRect().height)
-        window.parent.postMessage({ type: 'resize', height: height + 6 }, '*')
+        window.parent.postMessage({ type: 'resize', height: height }, '*')
       }
     }
 
@@ -177,10 +179,9 @@ export default function Home() {
     })
     resizeObserver.observe(containerRef.current)
 
-    // Triggers layout measurement checks when device switches to landscape or portrait mode
     const handleOrientationChange = () => {
       setTimeout(dispatchHeight, 200)
-      setTimeout(dispatchHeight, 500) // Double fallback ensures charts settle securely
+      setTimeout(dispatchHeight, 500) 
     }
 
     window.addEventListener('resize', handleOrientationChange)
@@ -248,10 +249,10 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Chart Canvas Box */}
+        {/* Chart Canvas Box - Dropped bottom margin to eliminate empty trailing row spaces */}
         <div style={{ height: 230, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 12 }}>
+            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: -4 }}>
               <CartesianGrid stroke="#e2e8f0" vertical={false} />
               
               {midnightLines.map(t => (
@@ -279,7 +280,7 @@ export default function Home() {
                   const d = new Date(payload.value)
                   return (
                     <g transform={`translate(${x},${y})`}>
-                      <text y={14} textAnchor="middle" fill="#000" fontSize={10} fontWeight={500}>
+                      <text y={12} textAnchor="middle" fill="#000" fontSize={10} fontWeight={500}>
                         {d.toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}
                       </text>
                     </g>

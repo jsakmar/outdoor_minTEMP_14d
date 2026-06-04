@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useRef } from 'react'
 import { createClient } from '@supabase/supabase-js'
 import {
   LineChart,
@@ -32,7 +32,6 @@ type ChartPoint = {
 
 const TZ = 'Europe/Bratislava'
 
-// ---------- aggregation ----------
 function aggregate15min(data: Row[]): ChartPoint[] {
   const buckets: Record<string, number[]> = {}
 
@@ -57,7 +56,6 @@ function aggregate15min(data: Row[]): ChartPoint[] {
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
 }
 
-// ---------- smoothing ----------
 function smooth(data: ChartPoint[]): ChartPoint[] {
   const w = 3
 
@@ -76,7 +74,6 @@ function smooth(data: ChartPoint[]): ChartPoint[] {
   })
 }
 
-// ---------- ticks ----------
 function generateTicks(data: ChartPoint[]) {
   if (!data.length) return []
 
@@ -95,7 +92,6 @@ function generateTicks(data: ChartPoint[]) {
   return ticks
 }
 
-// ---------- timezone-safe hour ----------
 function getHourInTZ(dateStr: string) {
   return Number(
     new Date(dateStr).toLocaleString('en-GB', {
@@ -106,7 +102,6 @@ function getHourInTZ(dateStr: string) {
   )
 }
 
-// ---------- tooltip ----------
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null
 
@@ -137,11 +132,11 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   )
 }
 
-// ---------- MAIN ----------
 export default function Page() {
   const [data, setData] = useState<ChartPoint[]>([])
   const [range, setRange] = useState(7)
   const [loading, setLoading] = useState(true)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   const fetchAll = async () => {
     const sinceDate = new Date(Date.now() - range * 86400000)
@@ -166,19 +161,18 @@ export default function Page() {
     return () => clearInterval(interval)
   }, [range])
 
-  // Dynamic frame resizing dispatch system
   useEffect(() => {
-    if (!loading) {
-      const sendHeight = () => {
-        setTimeout(() => {
-          const height = document.body.scrollHeight || document.documentElement.scrollHeight
-          window.parent.postMessage({ type: 'resize', height }, '*')
-        }, 150)
+    if (loading || !containerRef.current) return
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      for (let entry of entries) {
+        const height = Math.ceil(entry.contentRect.height)
+        window.parent.postMessage({ type: 'resize', height: height + 4 }, '*')
       }
-      sendHeight()
-      window.addEventListener('resize', sendHeight)
-      return () => window.removeEventListener('resize', sendHeight)
-    }
+    })
+
+    resizeObserver.observe(containerRef.current)
+    return () => resizeObserver.disconnect()
   }, [loading, data])
 
   const stats = useMemo(() => {
@@ -195,7 +189,7 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '220px', fontFamily: 'system-ui', color: '#64748b' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '265px', fontFamily: 'system-ui', color: '#64748b' }}>
         Loading temperature data...
       </div>
     )
@@ -203,10 +197,10 @@ export default function Page() {
 
   return (
     <main style={{ fontFamily: 'system-ui, sans-serif', background: '#fff', padding: 0, margin: 0, boxSizing: 'border-box', overflow: 'hidden', height: 'auto' }}>
-      <div style={{ width: '100%', maxWidth: '100%', background: '#fff', padding: '2px 4px 4px 0px', boxSizing: 'border-box', overflow: 'hidden', height: 'auto' }}>
+      <div ref={containerRef} style={{ width: '100%', maxWidth: '100%', background: '#fff', padding: '2px 4px 0px 0px', boxSizing: 'border-box', overflow: 'hidden', height: 'auto' }}>
         
-        {/* Buttons and Stats Panel Header */}
-        <div style={{ display: 'flex', gap: 6, marginBottom: 4, padding: '0 2px' }}>
+        {/* Buttons Panel */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 6, padding: '0 2px' }}>
           {[7, 14, 30].map(r => (
             <button
               key={r}
@@ -236,8 +230,8 @@ export default function Page() {
           ))}
         </div>
 
-        {/* Chart Viewport Canvas Box */}
-        <div style={{ height: 185, width: '100%' }}>
+        {/* Chart Canvas Box - Enlarged Height Spacing */}
+        <div style={{ height: 230, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 0 }}>
               <CartesianGrid stroke="#e2e8f0" vertical={false} />

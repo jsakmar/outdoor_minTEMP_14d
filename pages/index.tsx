@@ -56,7 +56,6 @@ function aggregate15min(data: Row[]): ChartPoint[] {
     .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
 }
 
-// ---------- smoothing ----------
 function smooth(data: ChartPoint[]): ChartPoint[] {
   const w = 3
 
@@ -75,7 +74,6 @@ function smooth(data: ChartPoint[]): ChartPoint[] {
   })
 }
 
-// ---------- ticks ----------
 function generateTicks(data: ChartPoint[]) {
   if (!data.length) return []
 
@@ -163,14 +161,14 @@ export default function Home() {
     return () => clearInterval(interval)
   }, [range])
 
-  // Height observer loop with extra whitespace buffers removed
   useEffect(() => {
     if (loading || !containerRef.current) return
 
     const dispatchHeight = () => {
       if (containerRef.current) {
         const height = Math.ceil(containerRef.current.getBoundingClientRect().height)
-        window.parent.postMessage({ type: 'resize', height: height }, '*')
+        // Adjusted padding balance offset to add an exact comfort space at the bottom
+        window.parent.postMessage({ type: 'resize', height: height + 2 }, '*')
       }
     }
 
@@ -249,10 +247,10 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Chart Canvas Box - Dropped bottom margin to eliminate empty trailing row spaces */}
+        {/* Chart Canvas Box - Adjusted bottom margin target to give labels a comfortable fit */}
         <div style={{ height: 230, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: -4 }}>
+            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 1 }}>
               <CartesianGrid stroke="#e2e8f0" vertical={false} />
               
               {midnightLines.map(t => (

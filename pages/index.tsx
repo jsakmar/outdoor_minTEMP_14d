@@ -134,7 +134,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 
 export default function Home() {
   const [data, setData] = useState<ChartPoint[]>([])
-  const [range, setRange] = useState(14) // Matching your 14d project baseline
+  const [range, setRange] = useState(14) 
   const [loading, setLoading] = useState(true)
   const containerRef = useRef<HTMLDivElement>(null)
 
@@ -230,10 +230,10 @@ export default function Home() {
           ))}
         </div>
 
-        {/* Chart Canvas Box */}
+        {/* Chart Canvas Box - Added bottom margins and padding safeguards to prevent X-Axis cutoff */}
         <div style={{ height: 230, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 0 }}>
+            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 15 }}>
               <CartesianGrid stroke="#e2e8f0" vertical={false} />
               
               {midnightLines.map(t => (
@@ -256,12 +256,13 @@ export default function Home() {
                 interval={0}
                 axisLine={false}
                 tickLine={false}
+                padding={{ bottom: 10 }}
                 tick={({ x, y, payload }) => {
                   if (getHourInTZ(payload.value) !== 0) return null
                   const d = new Date(payload.value)
                   return (
                     <g transform={`translate(${x},${y})`}>
-                      <text y={12} textAnchor="middle" fill="#000" fontSize={10} fontWeight={500}>
+                      <text y={14} textAnchor="middle" fill="#000" fontSize={10} fontWeight={500}>
                         {d.toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}
                       </text>
                     </g>

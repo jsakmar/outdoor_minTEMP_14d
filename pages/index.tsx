@@ -25,680 +25,278 @@ type Row = {
   module_name: string
 }
 
-type RainRow = {
-  day: string
-  rain_sum: number | null
-}
-
 type ChartPoint = {
   time: string
   temperature: number
-  rain: number | null
 }
 
 const TZ = 'Europe/Bratislava'
 
 // ---------- aggregation ----------
-function aggregate15min(
-  data: Row[]
-): ChartPoint[] {
-  const buckets: Record<
-    string,
-    number[]
-  > = {}
+function aggregate15min(data: Row[]): ChartPoint[] {
+  const buckets: Record<string, number[]> = {}
 
   data.forEach(row => {
     const d = new Date(row.time)
-
     if (isNaN(d.getTime())) return
 
-    d.setMinutes(
-      Math.floor(
-        d.getMinutes() / 15
-      ) * 15,
-      0,
-      0
-    )
-
+    d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0)
     const key = d.toISOString()
 
     if (!buckets[key]) {
       buckets[key] = []
     }
-
-    buckets[key].push(
-      row.temperature
-    )
+    buckets[key].push(row.temperature)
   })
 
-  return Object.entries(
-    buckets
-  )
+  return Object.entries(buckets)
     .map(([time, temps]) => ({
       time,
-      temperature:
-        temps.reduce(
-          (a, b) => a + b,
-          0
-        ) / temps.length,
-      rain: null
+      temperature: temps.reduce((a, b) => a + b, 0) / temps.length,
     }))
-    .sort(
-      (a, b) =>
-        new Date(
-          a.time
-        ).getTime() -
-        new Date(
-          b.time
-        ).getTime()
-    )
+    .sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime())
 }
 
 // ---------- smoothing ----------
-function smooth(
-  data: ChartPoint[]
-): ChartPoint[] {
+function smooth(data: ChartPoint[]): ChartPoint[] {
   const w = 3
 
   return data.map((p, i) => {
     const slice = data.slice(
       Math.max(0, i - w),
-      Math.min(
-        data.length,
-        i + w + 1
-      )
+      Math.min(data.length, i + w + 1)
     )
 
-    const avg =
-      slice.reduce(
-        (s, x) =>
-          s + x.temperature,
-        0
-      ) / slice.length
+    const avg = slice.reduce((s, x) => s + x.temperature, 0) / slice.length
 
     return {
       ...p,
-      temperature: Number(
-        avg.toFixed(1)
-      )
+      temperature: Number(avg.toFixed(1))
     }
   })
 }
 
 // ---------- ticks ----------
-function generateTicks(
-  data: ChartPoint[]
-) {
+function generateTicks(data: ChartPoint[]) {
   if (!data.length) return []
 
-  const start = new Date(
-    data[0].time
-  )
-
-  const end = new Date(
-    data[data.length - 1].time
-  )
-
+  const start = new Date(data[0].time)
+  const end = new Date(data[data.length - 1].time)
   const ticks: string[] = []
-
   const c = new Date(start)
 
   c.setMinutes(0, 0, 0)
 
   while (c <= end) {
-    ticks.push(
-      c.toISOString()
-    )
-
-    c.setHours(
-      c.getHours() + 1
-    )
+    ticks.push(c.toISOString())
+    c.setHours(c.getHours() + 1)
   }
 
   return ticks
 }
 
 // ---------- timezone-safe hour ----------
-function getHourInTZ(
-  dateStr: string
-) {
+function getHourInTZ(dateStr: string) {
   return Number(
-    new Date(
-      dateStr
-    ).toLocaleString(
-      'en-GB',
-      {
-        hour: '2-digit',
-        hour12: false,
-        timeZone: TZ
-      }
-    )
+    new Date(dateStr).toLocaleString('en-GB', {
+      hour: '2-digit',
+      hour12: false,
+      timeZone: TZ
+    })
   )
 }
 
 // ---------- tooltip ----------
-const CustomTooltip = ({
-  active,
-  payload,
-  label
-}: any) => {
-  if (
-    !active ||
-    !payload?.length
-  ) {
-    return null
-  }
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null
 
   const d = new Date(label)
+  const time = d.toLocaleTimeString('sk-SK', {
+    timeZone: TZ,
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 
-  const time =
-    d.toLocaleTimeString(
-      'sk-SK',
-      {
-        timeZone: TZ,
-        hour: '2-digit',
-        minute: '2-digit',
-      }
-    )
-
-  const temp =
-    payload.find(
-      (p: any) =>
-        p.dataKey ===
-        'temperature'
-    )?.value
-
-  // rain comes directly from row data
-  const rain =
-    payload?.[0]?.payload?.rain
+  const temp = payload.find((p: any) => p.dataKey === 'temperature')?.value
 
   return (
     <div
       style={{
         background: '#fff',
-        border:
-          '1px solid #e2e8f0',
+        border: '1px solid #e2e8f0',
         borderRadius: 6,
-        padding: '6px 8px'
+        padding: '4px 6px',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.05)'
       }}
     >
-      <div
-        style={{
-          fontSize: 10,
-          color: '#64748b'
-        }}
-      >
-        {time}
-      </div>
-
-      <div
-        style={{
-          fontWeight: 700,
-          fontSize: 14,
-          color: '#22c55e'
-        }}
-      >
+      <div style={{ fontSize: 10, color: '#64748b', marginBottom: 2 }}>{time}</div>
+      <div style={{ fontWeight: 700, fontSize: 13, color: '#22c55e' }}>
         {temp}°C
       </div>
-
-      {typeof rain ===
-        'number' && (
-        <div
-          style={{
-            fontSize: 12,
-            color: '#0ea5e9'
-          }}
-        >
-          {rain.toFixed(1)} mm
-        </div>
-      )}
     </div>
   )
 }
 
 // ---------- MAIN ----------
 export default function Page() {
-  const [data, setData] =
-    useState<
-      ChartPoint[]
-    >([])
+  const [data, setData] = useState<ChartPoint[]>([])
+  const [range, setRange] = useState(7)
+  const [loading, setLoading] = useState(true)
 
-  const [range, setRange] =
-    useState(7)
+  const fetchAll = async () => {
+    const sinceDate = new Date(Date.now() - range * 86400000)
+    const sinceISO = sinceDate.toISOString()
+
+    const { data: tempRaw } = await supabase
+      .from('netatmo_measurements')
+      .select('time, temperature, module_name')
+      .gte('time', sinceISO)
+      .eq('module_name', 'Outdoor')
+      .not('temperature', 'is', null)
+      .order('time', { ascending: true })
+
+    const processedData = smooth(aggregate15min(tempRaw ?? []))
+    setData(processedData)
+    setLoading(false)
+  }
 
   useEffect(() => {
-    let mounted = true
-
-    const fetchAll =
-      async () => {
-        const sinceDate =
-          new Date(
-            Date.now() -
-              range *
-                86400000
-          )
-
-        const sinceISO =
-          sinceDate.toISOString()
-
-        const sinceDay =
-          sinceISO.slice(
-            0,
-            10
-          )
-
-        // temperatures
-        const {
-          data: tempRaw
-        } = await supabase
-          .from(
-            'netatmo_measurements'
-          )
-          .select(
-            'time, temperature, module_name'
-          )
-          .gte(
-            'time',
-            sinceISO
-          )
-          .eq(
-            'module_name',
-            'Outdoor'
-          )
-          .not(
-            'temperature',
-            'is',
-            null
-          )
-          .order(
-            'time',
-            {
-              ascending: true
-            }
-          )
-
-        // rain
-        const {
-          data: rainRaw
-        } = await supabase
-          .from(
-            'netatmo_daily_stats'
-          )
-          .select(
-            'day, rain_sum'
-          )
-          .gte(
-            'day',
-            sinceDay
-          )
-
-        if (!mounted) return
-
-        const tempData =
-          smooth(
-            aggregate15min(
-              tempRaw ?? []
-            )
-          )
-
-        const rainMap: Record<
-          string,
-          number
-        > = {}
-
-        ;(
-          (rainRaw as RainRow[]) ||
-          []
-        ).forEach(r => {
-          rainMap[r.day] =
-            typeof r.rain_sum ===
-            'number'
-              ? r.rain_sum
-              : 0
-        })
-
-        const merged =
-          tempData.map(
-            p => {
-              const day =
-                p.time.slice(
-                  0,
-                  10
-                )
-
-              const hour =
-                getHourInTZ(
-                  p.time
-                )
-
-              const total =
-                rainMap[day] ||
-                0
-
-              // cumulative rain progression
-              const rainVal =
-                total *
-                ((hour + 1) /
-                  24)
-
-              return {
-                ...p,
-                rain:
-                  rainVal >
-                  0.2
-                    ? Number(
-                        rainVal.toFixed(
-                          2
-                        )
-                      )
-                    : null
-              }
-            }
-          )
-
-        setData(merged)
-      }
-
     fetchAll()
-
-    const interval =
-      setInterval(
-        fetchAll,
-        4 * 60 * 1000
-      )
-
-    return () => {
-      mounted = false
-      clearInterval(
-        interval
-      )
-    }
+    const interval = setInterval(fetchAll, 4 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [range])
 
-  // ---------- stats ----------
-  const stats = useMemo(() => {
-    if (!data.length) {
-      return null
-    }
-
-    const temps = data.map(
-      d => d.temperature
-    )
-
-    const rainPerDay =
-      new Map<
-        string,
-        number
-      >()
-
-    data.forEach(d => {
-      if (
-        typeof d.rain ===
-        'number'
-      ) {
-        const day =
-          d.time.slice(
-            0,
-            10
-          )
-
-        const current =
-          rainPerDay.get(
-            day
-          ) || 0
-
-        if (
-          d.rain >
-          current
-        ) {
-          rainPerDay.set(
-            day,
-            d.rain
-          )
-        }
+  // Dynamic frame resizing dispatch system
+  useEffect(() => {
+    if (!loading) {
+      const sendHeight = () => {
+        setTimeout(() => {
+          const height = document.body.scrollHeight || document.documentElement.scrollHeight
+          window.parent.postMessage({ type: 'resize', height }, '*')
+        }, 150)
       }
-    })
+      sendHeight()
+      window.addEventListener('resize', sendHeight)
+      return () => window.removeEventListener('resize', sendHeight)
+    }
+  }, [loading, data])
 
-    const rainTotal =
-      Array.from(
-        rainPerDay.values()
-      ).reduce(
-        (a, b) => a + b,
-        0
-      )
-
+  const stats = useMemo(() => {
+    if (!data.length) return null
+    const temps = data.map(d => d.temperature)
     return {
-      min: Math.min(
-        ...temps
-      ).toFixed(1),
-
-      max: Math.max(
-        ...temps
-      ).toFixed(1),
-
-      rain: rainTotal
+      min: Math.min(...temps).toFixed(1),
+      max: Math.max(...temps).toFixed(1),
     }
   }, [data])
 
-  const ticks = useMemo(
-    () =>
-      generateTicks(data),
-    [data]
-  )
+  const ticks = useMemo(() => generateTicks(data), [data])
+  const midnightLines = ticks.filter(t => getHourInTZ(t) === 0)
 
-  const midnightLines =
-    ticks.filter(
-      t =>
-        getHourInTZ(t) ===
-        0
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '220px', fontFamily: 'system-ui', color: '#64748b' }}>
+        Loading temperature data...
+      </div>
     )
+  }
 
   return (
-    <div
-      style={{
-        width: '100%',
-        maxWidth: 1150,
-        margin: '0 auto',
-        height: 280,
-        paddingTop: 6,
-        boxSizing:
-          'border-box'
-      }}
-    >
-      {/* buttons */}
-      <div
-        style={{
-          display: 'flex',
-          gap: 6,
-          marginBottom: 4,
-          padding:
-            '0 6px'
-        }}
-      >
-        {[7, 14, 30].map(
-          r => (
+    <main style={{ fontFamily: 'system-ui, sans-serif', background: '#fff', padding: 0, margin: 0, boxSizing: 'border-box', overflow: 'hidden', height: 'auto' }}>
+      <div style={{ width: '100%', maxWidth: '100%', background: '#fff', padding: '2px 4px 4px 0px', boxSizing: 'border-box', overflow: 'hidden', height: 'auto' }}>
+        
+        {/* Buttons and Stats Panel Header */}
+        <div style={{ display: 'flex', gap: 6, marginBottom: 4, padding: '0 2px' }}>
+          {[7, 14, 30].map(r => (
             <button
               key={r}
-              onClick={() =>
+              onClick={() => {
+                setLoading(true)
                 setRange(r)
-              }
+              }}
               style={{
                 flex: 1,
-                padding:
-                  '6px 0',
-                borderRadius: 8,
-                border:
-                  '1px solid #e2e8f0',
-                background:
-                  range === r
-                    ? '#22c55e'
-                    : '#fff',
-                color:
-                  range === r
-                    ? '#fff'
-                    : '#64748b',
+                padding: '4px 0',
+                borderRadius: 6,
+                border: '1px solid #e2e8f0',
+                background: range === r ? '#22c55e' : '#f8fafc',
+                color: range === r ? '#fff' : '#64748b',
                 fontSize: 12,
-                cursor:
-                  'pointer'
+                fontWeight: 600,
+                cursor: 'pointer'
               }}
             >
-              <div>
-                {r}d
-              </div>
-
-              {stats &&
-                range ===
-                  r && (
-                  <div
-                    style={{
-                      fontSize: 10
-                    }}
-                  >
-                    ↓
-                    {
-                      stats.min
-                    }
-                    {' '}
-                    ↑
-                    {
-                      stats.max
-                    }
-                    {' '}
-                    ☔
-                    {stats.rain.toFixed(
-                      1
-                    )}
-                    mm
-                  </div>
-                )}
+              <div>{r}d</div>
+              {stats && range === r && (
+                <div style={{ fontSize: 10, fontWeight: 500, marginTop: 1, opacity: 0.95 }}>
+                  ↓{stats.min}°C ↑{stats.max}°C
+                </div>
+              )}
             </button>
-          )
-        )}
-      </div>
+          ))}
+        </div>
 
-      <ResponsiveContainer
-        width="100%"
-        height="100%"
-      >
-        <LineChart
-          data={data}
-          margin={{
-            top: 16,
-            right: 8,
-            left: 0,
-            bottom: 0
-          }}
-        >
-          <CartesianGrid
-            stroke="#cbd5e1"
-            vertical={false}
-          />
+        {/* Chart Viewport Canvas Box */}
+        <div style={{ height: 185, width: '100%' }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 0 }}>
+              <CartesianGrid stroke="#e2e8f0" vertical={false} />
+              
+              {midnightLines.map(t => (
+                <ReferenceLine key={t} x={t} stroke="#cbd5e1" strokeWidth={1} />
+              ))}
+              
+              <ReferenceLine y={0} stroke="#475569" strokeWidth={1.2} />
 
-          {midnightLines.map(
-            t => (
-              <ReferenceLine
-                key={t}
-                x={t}
-                stroke="#cbd5e1"
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                width={30}
+                tick={{ fill: '#000', fontSize: 10, fontWeight: 500 }}
+                domain={['auto', 'auto']}
               />
-            )
-          )}
 
-          <ReferenceLine
-            y={0}
-            stroke="#000"
-            strokeWidth={
-              1.5
-            }
-          />
+              <XAxis
+                dataKey="time"
+                ticks={ticks}
+                interval={0}
+                axisLine={false}
+                tickLine={false}
+                tick={({ x, y, payload }) => {
+                  if (getHourInTZ(payload.value) !== 0) return null
+                  const d = new Date(payload.value)
+                  return (
+                    <g transform={`translate(${x},${y})`}>
+                      <text y={12} textAnchor="middle" fill="#000" fontSize={10} fontWeight={500}>
+                        {d.toLocaleDateString('sk-SK', { day: '2-digit', month: '2-digit' })}
+                      </text>
+                    </g>
+                  )
+                }}
+              />
 
-          <YAxis
-            axisLine={false}
-            tickLine={false}
-            width={30}
-            tick={{
-              fill: '#000',
-              fontSize: 11
-            }}
-            domain={[
-              'auto',
-              'auto'
-            ]}
-          />
+              <Tooltip content={<CustomTooltip />} shared={true} />
 
-          <XAxis
-            dataKey="time"
-            ticks={ticks}
-            interval={0}
-            axisLine={false}
-            tickLine={false}
-            tick={({
-              x,
-              y,
-              payload
-            }) => {
-              const d =
-                new Date(
-                  payload.value
-                )
+              <Area
+                type="monotone"
+                dataKey="temperature"
+                fill="rgba(34,197,94,0.06)"
+                stroke="none"
+              />
 
-              if (
-                getHourInTZ(
-                  payload.value
-                ) !== 0
-              ) {
-                return null
-              }
+              <Line
+                type="monotone"
+                dataKey="temperature"
+                stroke="#22c55e"
+                strokeWidth={2}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
 
-              return (
-                <g
-                  transform={`translate(${x},${y})`}
-                >
-                  <text
-                    y={-12}
-                    textAnchor="middle"
-                    fill="#334155"
-                    fontSize={11}
-                  >
-                    {d.toLocaleDateString(
-                      'sk-SK',
-                      {
-                        day: '2-digit',
-                        month:
-                          '2-digit'
-                      }
-                    )}
-                  </text>
-                </g>
-              )
-            }}
-          />
-
-          <Tooltip
-            content={
-              <CustomTooltip />
-            }
-          />
-
-          <Area
-            type="monotone"
-            dataKey="temperature"
-            fill="rgba(34,197,94,0.08)"
-            stroke="none"
-          />
-
-          <Line
-            type="monotone"
-            dataKey="temperature"
-            stroke="#22c55e"
-            strokeWidth={2}
-            dot={false}
-            activeDot={{
-              r: 4
-            }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
+      </div>
+    </main>
   )
 }

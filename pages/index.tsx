@@ -189,7 +189,7 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '265px', fontFamily: 'system-ui', color: '#64748b' }}>
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '310px', fontFamily: 'system-ui', color: '#64748b' }}>
         Loading temperature data...
       </div>
     )
@@ -230,7 +230,7 @@ export default function Page() {
           ))}
         </div>
 
-        {/* Chart Canvas Box - Enlarged Height Spacing */}
+        {/* Chart Canvas Box */}
         <div style={{ height: 230, width: '100%' }}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={data} margin={{ top: 6, right: 4, left: -24, bottom: 0 }}>
@@ -284,13 +284,3 @@ export default function Page() {
                 stroke="#22c55e"
                 strokeWidth={2}
                 dot={false}
-                activeDot={{ r: 4 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-
-      </div>
-    </main>
-  )
-}
